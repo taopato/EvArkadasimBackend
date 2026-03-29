@@ -114,7 +114,6 @@ namespace Persistence.Contexts
             {
                 eb.Property(p => p.AlacakliOnayi)
                   .HasColumnType("bit")
-                  .HasDefaultValue(false)
                   .IsRequired();
             });
 

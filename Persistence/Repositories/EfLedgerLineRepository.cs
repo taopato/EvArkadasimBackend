@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -36,7 +36,7 @@ namespace Persistence.Repositories
             => _ctx.SaveChangesAsync(ct);
 
         public Task<LedgerLine?> GetByIdAsync(long id, CancellationToken ct = default)
-            => _ctx.LedgerLines.FirstOrDefaultAsync(x => x.Id == id, ct);
+            => _ctx.LedgerLines.FirstOrDefaultAsync(x => x.Id == id && x.IsActive, ct);
 
         public Task<List<LedgerLine>> GetListAsync(Expression<Func<LedgerLine, bool>> predicate, CancellationToken ct = default)
             => _ctx.LedgerLines.Where(predicate).AsNoTracking().ToListAsync(ct);

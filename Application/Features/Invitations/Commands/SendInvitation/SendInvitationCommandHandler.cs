@@ -1,9 +1,9 @@
-﻿using Application.Features.Invitations.Dtos;
+using Application.Features.Invitations.Dtos;
 using Application.Services.Repositories;
 using Core.Utilities.Results;
 using Domain.Entities;
 using MediatR;
-using Core.Interfaces; // Eğer IMailService burada tanımlıysa
+using Core.Interfaces;
 
 namespace Application.Features.Invitations.Commands.SendInvitation
 {
@@ -11,6 +11,8 @@ namespace Application.Features.Invitations.Commands.SendInvitation
     {
         private readonly IInvitationRepository _invitationRepository;
         private readonly IMailService _mailService;
+        // Web uygulamasının base URL'i - production'da appsettings'ten okunabilir
+        private const string WebBaseUrl = "https://evarkadasim.com";
 
         public SendInvitationCommandHandler(
             IInvitationRepository invitationRepository,
@@ -22,14 +24,15 @@ namespace Application.Features.Invitations.Commands.SendInvitation
 
         public async Task<Response<SendInvitationResponseDto>> Handle(SendInvitationCommand request, CancellationToken cancellationToken)
         {
-            var code = new Random().Next(100000, 999999).ToString();
-            var expiresAt = DateTime.UtcNow.AddHours(2);
+            // Güvenli, tahmin edilemez bir token üret (6 haneli koddan daha güvenli)
+            var token = Guid.NewGuid().ToString("N")[..16].ToUpper();
+            var expiresAt = DateTime.UtcNow.AddDays(7); // 7 gün geçerli
 
             var invitation = new Invitation
             {
                 Email = request.Email,
                 HouseId = request.HouseId,
-                Token = code,
+                Token = token,
                 SentAt = DateTime.UtcNow,
                 ExpiresAt = expiresAt,
                 Status = "Pending"
@@ -37,15 +40,33 @@ namespace Application.Features.Invitations.Commands.SendInvitation
 
             await _invitationRepository.AddAsync(invitation);
 
-            // 📧 Mail gönderimi
-            string subject = "EvArkadasim - Davet Kodunuz";
-            string body = $"Merhaba,\n\nEv davet kodunuz: {code}\nKodun geçerlilik süresi: {expiresAt:dd.MM.yyyy HH:mm}\n\nEvArkadasim uygulaması ile daveti kabul edebilirsiniz.";
+            // Davet linki oluştur
+            var inviteLink = $"{WebBaseUrl}/davet-kabul?token={token}&houseId={request.HouseId}&email={Uri.EscapeDataString(request.Email)}";
+
+            // HTML e-posta gönder
+            string subject = "EvArkadasim - Eve Davet Edildiniz!";
+            string body = $@"
+Merhaba,
+
+Sizi ev grubuna katılmaya davet ettiler!
+
+Aşağıdaki butona tıklayarak hızlıca kayıt olun ve direkt eve dahil olun:
+
+👉 {inviteLink}
+
+Link {expiresAt:dd.MM.yyyy} tarihine kadar geçerlidir.
+
+EvArkadasim uygulaması ile ev arkadaşlarınızla harcamalarınızı kolayca takip edin.
+
+Saygılarımızla,
+EvArkadasim Ekibi
+";
 
             await _mailService.SendEmailAsync(request.Email, subject, body);
 
             var response = new SendInvitationResponseDto
             {
-                InvitationCode = code,
+                InvitationCode = token,
                 ExpiresAt = expiresAt
             };
 

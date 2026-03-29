@@ -1,4 +1,4 @@
-﻿using Domain.Entities;
+using Domain.Entities;
 
 public class User
 {
@@ -11,5 +11,7 @@ public class User
     public DateTime RegistrationDate { get; set; }
     public ICollection<HouseMember> HouseMembers { get; set; }
 
-
+    // --- SOFT DELETE ---
+    public bool IsActive { get; set; } = true;
+    public DateTime? DeactivatedAt { get; set; }
 }

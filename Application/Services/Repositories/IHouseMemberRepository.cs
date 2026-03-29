@@ -1,4 +1,4 @@
-﻿using Domain.Entities;
+using Domain.Entities;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -12,5 +12,8 @@ namespace Application.Services.Repositories
         IQueryable<HouseMember> Query();
         Task<House> GetByIdWithMembersAsync(int houseId);
         Task<List<int>> GetActiveUserIdsAsync(int houseId, CancellationToken ct = default);
+        Task<HouseMember?> GetByHouseAndUserAsync(int houseId, int userId);
+        Task UpdateAsync(HouseMember member);
+        Task SaveChangesAsync();
     }
 }

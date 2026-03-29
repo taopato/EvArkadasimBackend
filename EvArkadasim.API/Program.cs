@@ -188,7 +188,6 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
     EnsureReceiptTables(db);
-    EnsurePaymentColumns(db);
 }
 
 // 9) Pipeline
@@ -326,39 +325,6 @@ IF COL_LENGTH('ReceiptItems', 'BoxHeight') IS NULL
     ALTER TABLE [ReceiptItems] ADD [BoxHeight] INT NULL;
 IF COL_LENGTH('ReceiptItems', 'IsAssigned') IS NULL
     ALTER TABLE [ReceiptItems] ADD [IsAssigned] BIT NOT NULL CONSTRAINT [DF_ReceiptItems_IsAssigned] DEFAULT(0);
-""";
-
-    db.Database.ExecuteSqlRaw(sql);
-}
-
-static void EnsurePaymentColumns(AppDbContext db)
-{
-    const string sql = """
-IF OBJECT_ID(N'[Payments]', N'U') IS NOT NULL
-BEGIN
-    IF COL_LENGTH('Payments', 'HouseId') IS NULL
-        ALTER TABLE [Payments] ADD [HouseId] INT NULL;
-
-    IF COL_LENGTH('Payments', 'CreatedDate') IS NULL
-        ALTER TABLE [Payments] ADD [CreatedDate] DATETIME2 NOT NULL CONSTRAINT [DF_Payments_CreatedDate] DEFAULT(GETUTCDATE());
-
-    IF NOT EXISTS (
-        SELECT 1
-        FROM sys.indexes
-        WHERE name = 'IX_Payments_HouseId'
-          AND object_id = OBJECT_ID(N'[Payments]')
-    )
-        CREATE INDEX [IX_Payments_HouseId] ON [Payments]([HouseId]);
-
-    IF NOT EXISTS (
-        SELECT 1
-        FROM sys.foreign_keys
-        WHERE name = 'FK_Payments_Houses_HouseId'
-    )
-        ALTER TABLE [Payments] WITH NOCHECK
-        ADD CONSTRAINT [FK_Payments_Houses_HouseId]
-        FOREIGN KEY ([HouseId]) REFERENCES [Houses]([Id]);
-END;
 """;
 
     db.Database.ExecuteSqlRaw(sql);

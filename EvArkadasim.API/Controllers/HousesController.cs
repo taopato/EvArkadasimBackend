@@ -11,6 +11,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace WebAPI.Controllers
@@ -51,6 +52,13 @@ namespace WebAPI.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateHouseCommand command)
         {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(userIdClaim, out var userId) || userId <= 0)
+            {
+                return Unauthorized(new { message = "Gecerli kullanici kimligi bulunamadi." });
+            }
+
+            command.CreatorUserId = userId;
             var dto = await _mediator.Send(command);
             return Ok(dto);
         }

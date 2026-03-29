@@ -77,7 +77,11 @@ namespace EvArkadasim.API.Controllers
     [FromBody] SendVerificationCodeRequestDto dto)
         {
             var res = await _mediator.Send(
-                new SendVerificationCodeCommand { Email = dto.Email?.Trim() ?? string.Empty });
+                new SendVerificationCodeCommand
+                {
+                    Email = dto.Email?.Trim() ?? string.Empty,
+                    Purpose = dto.Purpose?.Trim().ToLowerInvariant() ?? "register"
+                });
             return Ok(res);
         }
 

@@ -7,5 +7,6 @@ namespace Application.Features.Auths.Commands.SendVerificationCode
     public class SendVerificationCodeCommand : IRequest<SendVerificationCodeResponseDto>
     {
         public string Email { get; set; } = string.Empty;
+        public string Purpose { get; set; } = "register";
     }
 }

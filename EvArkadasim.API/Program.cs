@@ -1,4 +1,4 @@
-﻿// Program.cs
+// Program.cs
 using MediatR;
 using FluentValidation;
 using Application.Common.Behaviors;
@@ -240,11 +240,13 @@ app.UseExceptionHandler(exceptionApp =>
 
 app.UseForwardedHeaders();
 
-// Dikkat: HTTPS yönlendirmesi SADECE prod'da
-if (!app.Environment.IsDevelopment())
-{
-    app.UseHttpsRedirection();
-}
+// Dikkat: HTTPS yönlendirmesi SADECE prod'da Nginx tarafından yapıldığı için 
+// uygulama içinde devre dışı bırakıyoruz. Aksi takdirde CORS preflight (OPTIONS)
+// istekleri yönlendirme nedeniyle başarısız oluyor.
+// if (!app.Environment.IsDevelopment())
+// {
+//     app.UseHttpsRedirection();
+// }
 
 app.UseStaticFiles();
 

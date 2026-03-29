@@ -10,5 +10,10 @@ public class SendVerificationCodeCommandValidator : AbstractValidator<SendVerifi
             .NotEmpty().WithMessage("E-posta zorunludur.")
             .EmailAddress().WithMessage("Gecerli bir e-posta giriniz.")
             .MaximumLength(200);
+
+        RuleFor(x => x.Purpose)
+            .NotEmpty().WithMessage("Dogrulama amaci zorunludur.")
+            .Must(x => x is "register" or "reset")
+            .WithMessage("Dogrulama amaci gecersiz.");
     }
 }

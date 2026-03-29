@@ -14,19 +14,33 @@ namespace Application.Features.Auths.Commands.SendVerificationCode
     {
         private readonly IVerificationCodeRepository _codeRepo;
         private readonly IMailService _mailService;
+        private readonly IUserRepository _userRepo;
 
         public SendVerificationCodeCommandHandler(
             IVerificationCodeRepository codeRepo,
-            IMailService mailService)
+            IMailService mailService,
+            IUserRepository userRepo)
         {
             _codeRepo = codeRepo;
             _mailService = mailService;
+            _userRepo = userRepo;
         }
 
         public async Task<SendVerificationCodeResponseDto> Handle(
             SendVerificationCodeCommand request,
             CancellationToken cancellationToken)
         {
+            var purpose = string.IsNullOrWhiteSpace(request.Purpose)
+                ? "register"
+                : request.Purpose.Trim().ToLowerInvariant();
+
+            var existingUser = await _userRepo.GetByEmailAsync(request.Email);
+            if (purpose == "register" && existingUser != null)
+                throw new InvalidOperationException("Bu e-posta zaten kayıtlı. Lütfen Şifremi unuttum akışını kullanın.");
+
+            if (purpose == "reset" && existingUser == null)
+                throw new InvalidOperationException("Bu e-posta ile kayıtlı bir hesap bulunamadı.");
+
             var code = new Random().Next(100000, 999999).ToString();
 
             var entity = new VerificationCode

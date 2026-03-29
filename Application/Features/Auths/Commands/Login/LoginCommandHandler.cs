@@ -25,13 +25,21 @@ namespace Application.Features.Auths.Commands.Login
             CancellationToken cancellationToken)
         {
             var user = await _userRepo.GetByEmailAsync(request.Email)
-                       ?? throw new UnauthorizedAccessException("E-posta veya şifre hatalı.");
+                       ?? throw new UnauthorizedAccessException("Bu e-posta ile kayitli bir kullanici bulunamadi. Lutfen once uye olun.");
 
             if (!HashingHelper.VerifyPasswordHash(request.Password, user.PasswordHash))
-                throw new UnauthorizedAccessException("E-posta veya şifre hatalı.");
+                throw new UnauthorizedAccessException("Sifreniz yanlis. Lutfen tekrar deneyin.");
 
 
-            var accessToken = _tokenHelper.CreateToken(user);
+            AccessToken accessToken;
+            try
+            {
+                accessToken = _tokenHelper.CreateToken(user);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Giris tokeni olusturulamadi: {ex.Message}");
+            }
 
             return new LoginResponseDto
             {

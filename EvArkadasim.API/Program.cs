@@ -21,9 +21,12 @@ using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Configuration
-    .AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true)
-    .AddEnvironmentVariables();
+if (builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+}
+
+builder.Configuration.AddEnvironmentVariables();
 
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();

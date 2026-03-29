@@ -369,3 +369,10 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Local and production secrets
+.env
+.env.*
+!.env.example
+EvArkadasim.API/appsettings.Local.json
+EvArkadasim.API/appsettings.Production.json

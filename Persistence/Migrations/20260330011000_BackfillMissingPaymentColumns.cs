@@ -1,10 +1,14 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Persistence.Contexts;
 
 #nullable disable
 
 namespace Persistence.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(AppDbContext))]
+    [Migration("20260330011000_BackfillMissingPaymentColumns")]
     public partial class BackfillMissingPaymentColumns : Migration
     {
         /// <inheritdoc />

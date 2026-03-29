@@ -1,10 +1,14 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Persistence.Contexts;
 
 #nullable disable
 
 namespace Persistence.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(AppDbContext))]
+    [Migration("20260330012500_RemoveLegacyPaymentNotColumn")]
     public partial class RemoveLegacyPaymentNotColumn : Migration
     {
         /// <inheritdoc />

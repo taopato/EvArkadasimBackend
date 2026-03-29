@@ -51,7 +51,8 @@ namespace EvArkadasim.API.Controllers
                 Email = dto.Email?.Trim() ?? string.Empty,
                 Code = dto.Code?.Trim() ?? string.Empty,
                 FullName = dto.FullName?.Trim(),
-                Password = dto.Password
+                Password = dto.Password,
+                InvitationToken = dto.InvitationToken?.Trim()
             };
             var res = await _mediator.Send(cmd);
             return Ok(res);

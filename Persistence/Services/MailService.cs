@@ -21,12 +21,12 @@ namespace Persistence.Services
 
         public MailService(IConfiguration configuration)
         {
-            _smtpServer = configuration["SmtpSettings:Server"] ?? DefaultSmtpServer;
-            _smtpPort = int.TryParse(configuration["SmtpSettings:Port"], out var configuredPort)
+            _smtpServer = ResolveSetting(configuration["SmtpSettings:Server"], DefaultSmtpServer);
+            _smtpPort = int.TryParse(ResolveSetting(configuration["SmtpSettings:Port"], DefaultSmtpPort.ToString()), out var configuredPort)
                 ? configuredPort
                 : DefaultSmtpPort;
-            _senderEmail = configuration["SmtpSettings:SenderEmail"] ?? DefaultSenderEmail;
-            _senderPassword = configuration["SmtpSettings:Password"] ?? DefaultSenderPassword;
+            _senderEmail = ResolveSetting(configuration["SmtpSettings:SenderEmail"], DefaultSenderEmail);
+            _senderPassword = ResolveSetting(configuration["SmtpSettings:Password"], DefaultSenderPassword);
         }
 
         public async Task SendEmailAsync(string to, string subject, string body)
@@ -48,6 +48,17 @@ namespace Persistence.Services
 
             // Asenkron gönderim
             await client.SendMailAsync(message);
+        }
+
+        private static string ResolveSetting(string? configuredValue, string fallbackValue)
+        {
+            if (string.IsNullOrWhiteSpace(configuredValue))
+                return fallbackValue;
+
+            var value = configuredValue.Trim();
+            return value.StartsWith("CHANGE_ME_", System.StringComparison.OrdinalIgnoreCase)
+                ? fallbackValue
+                : value;
         }
     }
 }

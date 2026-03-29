@@ -1,9 +1,10 @@
 using Application.Features.Invitations.Dtos;
 using Application.Services.Repositories;
+using Core.Interfaces;
 using Core.Utilities.Results;
 using Domain.Entities;
 using MediatR;
-using Core.Interfaces;
+using Microsoft.Extensions.Configuration;
 
 namespace Application.Features.Invitations.Commands.SendInvitation
 {
@@ -11,22 +12,22 @@ namespace Application.Features.Invitations.Commands.SendInvitation
     {
         private readonly IInvitationRepository _invitationRepository;
         private readonly IMailService _mailService;
-        // Web uygulamasının base URL'i - production'da appsettings'ten okunabilir
-        private const string WebBaseUrl = "https://www.evarkadasim.co";
+        private readonly string _webBaseUrl;
 
         public SendInvitationCommandHandler(
             IInvitationRepository invitationRepository,
-            IMailService mailService)
+            IMailService mailService,
+            IConfiguration configuration)
         {
             _invitationRepository = invitationRepository;
             _mailService = mailService;
+            _webBaseUrl = (configuration["AppUrls:WebBaseUrl"] ?? "https://www.evarkadasim.co").TrimEnd('/');
         }
 
         public async Task<Response<SendInvitationResponseDto>> Handle(SendInvitationCommand request, CancellationToken cancellationToken)
         {
-            // Güvenli, tahmin edilemez bir token üret (6 haneli koddan daha güvenli)
             var token = Guid.NewGuid().ToString("N")[..16].ToUpper();
-            var expiresAt = DateTime.UtcNow.AddDays(7); // 7 gün geçerli
+            var expiresAt = DateTime.UtcNow.AddDays(7);
 
             var invitation = new Invitation
             {
@@ -40,12 +41,10 @@ namespace Application.Features.Invitations.Commands.SendInvitation
 
             await _invitationRepository.AddAsync(invitation);
 
-            // Davet linki oluştur
-            var inviteLink = $"{WebBaseUrl}/davet-kabul?token={token}&houseId={request.HouseId}&email={Uri.EscapeDataString(request.Email)}";
+            var inviteLink = $"{_webBaseUrl}/davet-kabul?token={token}&houseId={request.HouseId}&email={Uri.EscapeDataString(request.Email)}";
 
-            // HTML e-posta gönder
-            string subject = "EvArkadasim - Eve Davet Edildiniz!";
-            string body = $@"
+            var subject = "EvArkadasim - Eve Davet Edildiniz!";
+            var body = $@"
 <div style=""font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;"">
     <h2 style=""color: #4CAF50;"">Merhaba,</h2>
     <p>Sizi ev grubuna katılmaya davet ettiler!</p>

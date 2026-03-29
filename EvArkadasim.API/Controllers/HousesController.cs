@@ -6,9 +6,11 @@ using Application.Features.Houses.Queries.GetUserDebts;
 using Application.Features.Houses.Queries.GetUserHouses;
 using Application.Features.Invitations.Commands.SendInvitation;
 using Application.Features.Invitations.Dtos;
+using Application.Services.Repositories;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace WebAPI.Controllers
@@ -19,7 +21,32 @@ namespace WebAPI.Controllers
     public class HousesController : ControllerBase
     {
         private readonly IMediator _mediator;
-        public HousesController(IMediator mediator) => _mediator = mediator;
+        private readonly IHouseRepository _houseRepository;
+
+        public HousesController(IMediator mediator, IHouseRepository houseRepository)
+        {
+            _mediator = mediator;
+            _houseRepository = houseRepository;
+        }
+
+        [HttpGet("{houseId:int}")]
+        public async Task<IActionResult> GetById(int houseId)
+        {
+            try
+            {
+                var house = await _houseRepository.GetByIdAsync(houseId);
+                return Ok(new
+                {
+                    house.Id,
+                    house.Name,
+                    house.CreatorUserId
+                });
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound(new { message = "Ev bulunamadi." });
+            }
+        }
 
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateHouseCommand command)

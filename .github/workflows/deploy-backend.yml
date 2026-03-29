@@ -20,6 +20,13 @@ jobs:
       - name: Publish backend
         run: dotnet publish ./EvArkadasim.API/EvArkadasim.API.csproj -c Release -r linux-x64 --self-contained true -o ./publish-linux
 
+      - name: Remove environment-specific config files from deploy bundle
+        run: |
+          rm -f ./publish-linux/appsettings.json
+          rm -f ./publish-linux/appsettings.Development.json
+          rm -f ./publish-linux/appsettings.Local.json
+          rm -f ./publish-linux/appsettings.Production.json
+
       - name: Copy backend to server
         uses: appleboy/scp-action@v0.1.7
         with:

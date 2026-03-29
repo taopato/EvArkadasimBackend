@@ -32,8 +32,8 @@ namespace EvArkadasim.API.Controllers
         {
             var cmd = new VerifyCodeAndRegisterCommand
             {
-                Email = dto.Email,
-                Code = dto.Code,
+                Email = dto.Email?.Trim() ?? string.Empty,
+                Code = dto.Code?.Trim() ?? string.Empty,
                 FullName = null!,     // handler’da fullname==null ise bu kod akışına girer
                 Password = string.Empty
             };
@@ -48,9 +48,9 @@ namespace EvArkadasim.API.Controllers
         {
             var cmd = new VerifyCodeAndRegisterCommand
             {
-                Email = dto.Email,
-                Code = dto.Code,
-                FullName = dto.FullName,
+                Email = dto.Email?.Trim() ?? string.Empty,
+                Code = dto.Code?.Trim() ?? string.Empty,
+                FullName = dto.FullName?.Trim(),
                 Password = dto.Password
             };
             var res = await _mediator.Send(cmd);
@@ -64,8 +64,8 @@ namespace EvArkadasim.API.Controllers
         {
             var cmd = new ResetPasswordCommand
             {
-                Email = dto.Email,
-                Code = dto.Code,
+                Email = dto.Email?.Trim() ?? string.Empty,
+                Code = dto.Code?.Trim() ?? string.Empty,
                 NewPassword = dto.NewPassword
             };
             var res = await _mediator.Send(cmd);
@@ -77,7 +77,7 @@ namespace EvArkadasim.API.Controllers
     [FromBody] SendVerificationCodeRequestDto dto)
         {
             var res = await _mediator.Send(
-                new SendVerificationCodeCommand { Email = dto.Email });
+                new SendVerificationCodeCommand { Email = dto.Email?.Trim() ?? string.Empty });
             return Ok(res);
         }
 
@@ -88,7 +88,7 @@ namespace EvArkadasim.API.Controllers
             {
                 var result = await _mediator.Send(new LoginCommand
                 {
-                    Email = dto.Email,
+                    Email = dto.Email?.Trim() ?? string.Empty,
                     Password = dto.Password
                 });
                 return Ok(result);

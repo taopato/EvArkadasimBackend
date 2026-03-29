@@ -1,4 +1,5 @@
 ﻿// Application/Features/Auths/Commands/ResetPassword/ResetPasswordValidator.cs
+using Application.Common.Validation;
 using FluentValidation;
 
 namespace Application.Features.Auths.Commands.ResetPassword
@@ -9,11 +10,11 @@ namespace Application.Features.Auths.Commands.ResetPassword
         public ResetPasswordValidator()
         {
             RuleFor(x => x.Email).NotEmpty().EmailAddress();
-            RuleFor(x => x.Code).NotEmpty().Length(6);
-            RuleFor(x => x.NewPassword)
+            RuleFor(x => x.Code)
                 .NotEmpty()
-                .MinimumLength(8)
-                .WithMessage("Yeni şifre en az 8 karakter olmalı.");
+                .Matches(@"^\d{6}$")
+                .WithMessage("Dogrulama kodu 6 haneli olmali.");
+            RuleFor(x => x.NewPassword).StrongPassword();
         }
     }
 }

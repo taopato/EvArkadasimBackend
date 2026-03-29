@@ -3,6 +3,7 @@ using MediatR;
 using Application.Features.Auths.Dtos;
 using Application.Services.Repositories;
 using Core.Security.Hashing;
+using Core.Security.JWT;
 using Domain.Entities;
 
 namespace Application.Features.Auths.Commands.VerifyCodeAndRegister
@@ -12,13 +13,16 @@ namespace Application.Features.Auths.Commands.VerifyCodeAndRegister
     {
         private readonly IVerificationCodeRepository _codeRepo;
         private readonly IUserRepository _userRepo;
+        private readonly ITokenHelper _tokenHelper;
 
         public VerifyCodeAndRegisterCommandHandler(
             IVerificationCodeRepository codeRepo,
-            IUserRepository userRepo)
+            IUserRepository userRepo,
+            ITokenHelper tokenHelper)
         {
             _codeRepo = codeRepo;
             _userRepo = userRepo;
+            _tokenHelper = tokenHelper;
         }
 
         public async Task<VerifyCodeAndRegisterResponseDto> Handle(
@@ -59,11 +63,27 @@ namespace Application.Features.Auths.Commands.VerifyCodeAndRegister
             };
             await _userRepo.AddAsync(user);
             await _codeRepo.DeleteAsync(codeEntity);
+            var fullName = $"{user.FirstName} {user.LastName}".Trim();
+
+            string? token = null;
+            try
+            {
+                var accessToken = _tokenHelper.CreateToken(user);
+                token = accessToken.Token;
+            }
+            catch
+            {
+                token = null;
+            }
 
             return new VerifyCodeAndRegisterResponseDto
             {
                 IsSuccess = true,
-                Message = "Kullanıcı başarıyla kaydedildi."
+                Message = "Kullanici basariyla kaydedildi.",
+                Id = user.Id,
+                Email = user.Email,
+                FullName = fullName,
+                Token = token
             };
         }
     }

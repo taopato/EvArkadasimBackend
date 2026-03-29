@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net7.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- EF Core -->
+		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.16" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.16">
+			<PrivateAssets>all</PrivateAssets>
+		</PackageReference>
+		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="7.0.16" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="7.0.16">
+		  <PrivateAssets>all</PrivateAssets>
+		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+
+		<!-- Configuration & JWT -->
+		<PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.7" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.7" />
+		<PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.13.0" />
+		<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.13.0" />
+
+		<!-- Kod-first için gerekli diğer paketler -->
+		<!-- × FluentValidation, MediatR, AutoMapper vb. burada eklenebilir × -->
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- PROJE REFERANSLARI: Persistence -> Domain, Core, Application -->
+		<ProjectReference Include="..\Domain\Domain.csproj" />
+		<ProjectReference Include="..\Core\Core.csproj" />
+		<ProjectReference Include="..\Application\Application.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Migrations\" />
+	</ItemGroup>
+
+</Project>

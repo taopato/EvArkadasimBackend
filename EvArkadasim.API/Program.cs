@@ -339,6 +339,9 @@ BEGIN
     IF COL_LENGTH('Payments', 'HouseId') IS NULL
         ALTER TABLE [Payments] ADD [HouseId] INT NULL;
 
+    IF COL_LENGTH('Payments', 'CreatedDate') IS NULL
+        ALTER TABLE [Payments] ADD [CreatedDate] DATETIME2 NOT NULL CONSTRAINT [DF_Payments_CreatedDate] DEFAULT(GETUTCDATE());
+
     IF NOT EXISTS (
         SELECT 1
         FROM sys.indexes

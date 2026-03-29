@@ -12,9 +12,12 @@ public class VerifyCodeAndRegisterCommandValidator : AbstractValidator<VerifyCod
             .EmailAddress().WithMessage("Gecerli bir e-posta giriniz.")
             .MaximumLength(200);
 
-        RuleFor(x => x.Code)
-            .NotEmpty().WithMessage("Dogrulama kodu zorunludur.")
-            .Matches(@"^\d{6}$").WithMessage("Dogrulama kodu 6 haneli olmali.");
+        When(x => string.IsNullOrEmpty(x.InvitationToken), () =>
+        {
+            RuleFor(x => x.Code)
+                .NotEmpty().WithMessage("Dogrulama kodu zorunludur.")
+                .Matches(@"^\d{6}$").WithMessage("Dogrulama kodu 6 haneli olmali.");
+        });
 
         When(x => !string.IsNullOrWhiteSpace(x.FullName), () =>
         {

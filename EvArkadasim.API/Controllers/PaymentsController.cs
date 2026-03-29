@@ -1,4 +1,4 @@
-﻿// EvArkadasim.API/Controllers/PaymentsController.cs
+// EvArkadasim.API/Controllers/PaymentsController.cs
 using System;
 using System.IO;
 using System.Threading.Tasks;
@@ -13,29 +13,22 @@ using Application.Features.Payments.Queries.GetPaymentList;
 using Application.Features.Payments.Queries.GetPendingPayments;
 using Application.Features.Payments.Commands.ApprovePayment;
 using Application.Features.Payments.Commands.RejectPayment;
+using Application.Features.Payments.Commands.DeletePayment;
 using Domain.Enums;
 using Application.Features.Payments.Commands.AddPaymentWithAllocations;
 
 namespace EvArkadasim.API.Controllers
 {
-    // İstersen ayrı dosyaya taşıyabilirsin; burada kalması da sorun değil
     public class CreatePaymentForm
     {
         public int HouseId { get; set; }
         public int BorcluUserId { get; set; }
         public int AlacakliUserId { get; set; }
         public decimal Tutar { get; set; }
-
-        // "Cash" | "BankTransfer" (varsayılan BankTransfer)
         public string? PaymentMethod { get; set; } = "BankTransfer";
-
-        // BankTransfer’de zorunlu, Cash’te opsiyonel
         public IFormFile? Dekont { get; set; }
-
         public DateTime? OdemeTarihi { get; set; }
         public string? Aciklama { get; set; }
-
-        // 🔽 yeni: katkının hangi cycle için olduğu (opsiyonel bıraktım ama handler’da doğrulamanı öneririm)
         public int? ChargeId { get; set; }
     }
 
@@ -53,9 +46,6 @@ namespace EvArkadasim.API.Controllers
             _env = env;
         }
 
-        // POST: /api/Payments/CreatePayment  (multipart/form-data)
-        // Cash -> dekont zorunlu değil
-        // BankTransfer -> dekont ZORUNLU
         [HttpPost("CreatePayment")]
         [DisableRequestSizeLimit]
         public async Task<IActionResult> CreatePayment([FromForm] CreatePaymentForm form)
@@ -95,8 +85,6 @@ namespace EvArkadasim.API.Controllers
                 OdemeTarihi = form.OdemeTarihi ?? DateTime.UtcNow,
                 Aciklama = form.Aciklama,
                 DekontUrl = dekontUrl,
-
-                // 🔽 yeni: chargeId’yi komuta geçir
                 ChargeId = form.ChargeId
             };
 
@@ -104,7 +92,6 @@ namespace EvArkadasim.API.Controllers
             return CreatedAtAction(nameof(CreatePayment), new { id = result.Id }, result);
         }
 
-        // GET: /api/Payments/GetPayments/{houseId}
         [HttpGet("GetPayments/{houseId}")]
         public async Task<IActionResult> GetPayments(int houseId)
         {
@@ -112,7 +99,6 @@ namespace EvArkadasim.API.Controllers
             return Ok(list);
         }
 
-        // GET: /api/Payments/GetPendingPayments/{userId}
         [HttpGet("GetPendingPayments/{userId:int}")]
         public async Task<IActionResult> GetPendingPayments([FromRoute] int userId)
         {
@@ -120,30 +106,26 @@ namespace EvArkadasim.API.Controllers
             return Ok(result);
         }
 
-        // POST: /api/Payments/ApprovePayment/{paymentId}
         [HttpPost("ApprovePayment/{paymentId:int}")]
         public async Task<IActionResult> ApprovePayment([FromRoute] int paymentId)
         {
             var result = await _mediator.Send(new ApprovePaymentCommand(paymentId));
-            return Ok(new
-            {
-                success = true,
-                message = "Ödeme başarıyla onaylandı",
-                data = result
-            });
+            return Ok(new { success = true, message = "Ödeme başarıyla onaylandı", data = result });
         }
 
-        // POST: /api/Payments/RejectPayment/{paymentId}
         [HttpPost("RejectPayment/{paymentId:int}")]
         public async Task<IActionResult> RejectPayment([FromRoute] int paymentId)
         {
             var result = await _mediator.Send(new RejectPaymentCommand(paymentId));
-            return Ok(new
-            {
-                success = true,
-                message = "Ödeme reddedildi",
-                data = result
-            });
+            return Ok(new { success = true, message = "Ödeme reddedildi", data = result });
+        }
+
+        /// <summary>DELETE /api/Payments/{id}?requestingUserId=123 — Soft delete</summary>
+        [HttpDelete("{id:int}")]
+        public async Task<IActionResult> DeletePayment([FromRoute] int id, [FromQuery] int requestingUserId)
+        {
+            await _mediator.Send(new DeletePaymentCommand(id, requestingUserId));
+            return Ok(new { success = true, message = "Ödeme silindi." });
         }
 
         [HttpPost("AddPaymentWithAllocations")]

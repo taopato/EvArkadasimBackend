@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Domain.Entities;
 using MediatR;
 using Application.Features.Houses.Dtos;
@@ -21,7 +21,7 @@ namespace Application.Features.Houses.Commands.CreateHouse
         public async Task<CreatedHouseDto> Handle(CreateHouseCommand request, CancellationToken cancellationToken)
         {
             // 1) Yeni house oluştur
-            var entity = new House { Name = request.Name };
+            var entity = new House { Name = request.Name, CreatorUserId = request.CreatorUserId };
 
             // 2) Kaydet
             var added = await _houseRepository.AddAsync(entity);

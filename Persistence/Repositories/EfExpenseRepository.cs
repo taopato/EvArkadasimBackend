@@ -1,4 +1,4 @@
-﻿using Application.Services.Repositories;
+using Application.Services.Repositories;
 using Domain.Entities;
 using Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
@@ -32,6 +32,7 @@ namespace Persistence.Repositories
         public async Task<List<Expense>> GetAllAsync()
         {
             return await _context.Expenses
+                                 .Where(e => e.IsActive)
                                  .AsNoTracking()
                                  .ToListAsync();
         }
@@ -52,18 +53,20 @@ namespace Persistence.Repositories
         public async Task<List<Expense>> GetByHouseIdAsync(int houseId)
         {
             return await _context.Expenses
-                                 .Where(e => e.HouseId == houseId)
+                                 .Where(e => e.HouseId == houseId && e.IsActive)
                                  .ToListAsync();
         }
 
         public async Task<List<Expense>> GetListAsync()
         {
-            return await _context.Expenses.ToListAsync();
+            return await _context.Expenses
+                                 .Where(e => e.IsActive)
+                                 .ToListAsync();
         }
 
         public async Task<Expense?> GetByIdAsync(int id)
         {
-            return await _context.Expenses.FindAsync(id);
+            return await _context.Expenses.FirstOrDefaultAsync(e => e.Id == id && e.IsActive);
         }
 
         public async Task DeleteAsync(Expense entity)
@@ -81,7 +84,7 @@ namespace Persistence.Repositories
 
         public IQueryable<Expense> Query()
         {
-            return _context.Expenses.AsQueryable();
+            return _context.Expenses.Where(e => e.IsActive).AsQueryable();
         }
     }
 }

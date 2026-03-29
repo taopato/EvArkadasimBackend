@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace Domain.Entities
 {
@@ -11,5 +11,10 @@ namespace Domain.Entities
         public User User { get; set; } = null!;
 
         public DateTime JoinedDate { get; set; } = DateTime.UtcNow;
+
+        // --- SOFT DELETE ---
+        public bool IsActive { get; set; } = true;
+        public DateTime? LeftAt { get; set; }
+        public int? RemovedByUserId { get; set; }
     }
 }

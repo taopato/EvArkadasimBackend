@@ -1,4 +1,4 @@
-﻿// Persistence/Repositories/EfPaymentRepository.cs
+// Persistence/Repositories/EfPaymentRepository.cs
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -17,17 +17,17 @@ namespace Persistence.Repositories
 
         // --- MEVCUT METODLARIN ---
         public async Task<List<Payment>> GetAllAsync()
-            => await _context.Payments.ToListAsync();
+            => await _context.Payments.Where(p => !p.IsDeleted).ToListAsync();
 
         public async Task<decimal> GetTotalAlacaklıAsync(int houseId, int userId)
             // houseId’i şimdilik kullanmıyoruz
             => await _context.Payments
-                .Where(p => p.AlacakliUserId == userId)
+                .Where(p => p.AlacakliUserId == userId && !p.IsDeleted)
                 .SumAsync(p => (decimal?)p.Tutar) ?? 0m;
 
         public async Task<decimal> GetTotalBorçluAsync(int houseId, int userId)
             => await _context.Payments
-                .Where(p => p.BorcluUserId == userId)
+                .Where(p => p.BorcluUserId == userId && !p.IsDeleted)
                 .SumAsync(p => (decimal?)p.Tutar) ?? 0m;
 
         public async Task<Payment> AddAsync(Payment entity)
@@ -42,14 +42,14 @@ namespace Persistence.Repositories
             return await _context.Payments
                                  .Include(p => p.BorcluUser)
                                  .Include(p => p.AlacakliUser)
-                                 .Where(p => p.HouseId == houseId)
+                                 .Where(p => p.HouseId == houseId && !p.IsDeleted)
                                  .OrderByDescending(p => p.OdemeTarihi)
                                  .ToListAsync();
         }
 
         public IQueryable<Payment> Query()
         {
-            return _context.Payments.AsQueryable();
+            return _context.Payments.Where(p => !p.IsDeleted).AsQueryable();
         }
 
         public async Task SaveChangesAsync()
@@ -63,7 +63,7 @@ namespace Persistence.Repositories
             return await _context.Payments
                 .Include(p => p.BorcluUser)
                 .Include(p => p.AlacakliUser)
-                .FirstOrDefaultAsync(p => p.Id == id);
+                .FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
         }
 
         public async Task<IList<Payment>> GetPendingByAlacakliAsync(int alacakliUserId)
@@ -71,6 +71,7 @@ namespace Persistence.Repositories
             return await _context.Payments
                 .Include(p => p.BorcluUser)
                 .Where(p => p.AlacakliUserId == alacakliUserId
+                         && !p.IsDeleted
                          && p.Status == Domain.Enums.PaymentStatus.Pending)
                 .OrderByDescending(p => p.OdemeTarihi)
                 .ToListAsync();

@@ -1,5 +1,5 @@
-﻿using System;
-using Domain.Enums; // <-- eklendi
+using System;
+using Domain.Enums;
 
 namespace Domain.Entities
 {
@@ -18,26 +18,27 @@ namespace Domain.Entities
 
         public decimal Tutar { get; set; }
 
-        // wwwroot/uploads/payments/ altında sakladığın dosyanın göreli (public) yolu
         public string DekontUrl { get; set; } = string.Empty;
 
-        // Ödemenin yapıldığı tarih (gelmezse API'de UtcNow veriyoruz)
         public DateTime OdemeTarihi { get; set; }
 
-        // Opsiyonel açıklama
         public string? Aciklama { get; set; }
 
         public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
-        public bool AlacakliOnayi { get; set; } = false; // <- non-nullable ve default
+        public bool AlacakliOnayi { get; set; } = false;
 
-        // --- YENİ ALANLAR ---
-        public PaymentMethod PaymentMethod { get; set; } = PaymentMethod.BankTransfer; // Nakit/IBAN
+        public PaymentMethod PaymentMethod { get; set; } = PaymentMethod.BankTransfer;
         public PaymentStatus Status { get; set; } = PaymentStatus.Pending;
         public DateTime? ApprovedDate { get; set; }
         public int? ApprovedByUserId { get; set; }
         public DateTime? RejectedDate { get; set; }
         public int? RejectedByUserId { get; set; }
-        public int? ChargeId { get; set; }           // NEW
-        public ChargeCycle? Charge { get; set; }     // NEW (isteğe bağlı navigation)
+        public int? ChargeId { get; set; }
+        public ChargeCycle? Charge { get; set; }
+
+        // --- SOFT DELETE ---
+        public bool IsDeleted { get; set; } = false;
+        public DateTime? DeletedAt { get; set; }
+        public int? DeletedByUserId { get; set; }
     }
 }

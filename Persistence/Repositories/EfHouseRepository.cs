@@ -1,4 +1,4 @@
-﻿using Application.Services.Repositories;
+using Application.Services.Repositories;
 using Domain.Entities;
 using Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
@@ -23,7 +23,7 @@ namespace Persistence.Repositories
 
         public async Task<List<House>> GetAllAsync()
             => await _context.Houses
-                             .Include(h => h.HouseMembers)
+                             .Include(h => h.HouseMembers.Where(m => m.IsActive))
                              .ThenInclude(m => m.User)
                              .AsNoTracking()
                              .ToListAsync();
@@ -31,7 +31,7 @@ namespace Persistence.Repositories
         public async Task<House> GetByIdAsync(int id)
         {
             return await _context.Houses
-                .Include(h => h.HouseMembers)
+                .Include(h => h.HouseMembers.Where(m => m.IsActive))
                     .ThenInclude(m => m.User)
                 .FirstOrDefaultAsync(h => h.Id == id)
                 ?? throw new KeyNotFoundException("House bulunamadı.");
@@ -49,9 +49,23 @@ namespace Persistence.Repositories
                 .FirstOrDefaultAsync(m => m.HouseId == houseId && m.UserId == userId);
             if (entry != null)
             {
-                _context.HouseMembers.Remove(entry);
+                // Soft delete mantığına çeviriyoruz
+                entry.IsActive = false;
+                entry.LeftAt = DateTime.UtcNow;
+                _context.HouseMembers.Update(entry);
                 await _context.SaveChangesAsync();
             }
+        }
+
+        public async Task UpdateAsync(House entity)
+        {
+            _context.Houses.Update(entity);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task SaveChangesAsync()
+        {
+            await _context.SaveChangesAsync();
         }
     }
 }

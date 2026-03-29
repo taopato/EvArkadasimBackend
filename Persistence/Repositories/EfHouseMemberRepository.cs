@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -21,13 +21,13 @@ namespace Persistence.Repositories
 
         public IQueryable<HouseMember> Query()
         {
-            return _context.HouseMembers.AsQueryable();
+            return _context.HouseMembers.Where(hm => hm.IsActive).AsQueryable();
         }
 
         public async Task<List<HouseMember>> GetByHouseIdAsync(int houseId)
         {
             return await _context.HouseMembers
-                .Where(h => h.HouseId == houseId)
+                .Where(h => h.HouseId == houseId && h.IsActive)
                 .Include(h => h.User)
                 .AsNoTracking()
                 .ToListAsync();
@@ -36,7 +36,7 @@ namespace Persistence.Repositories
         public async Task<House> GetByIdWithMembersAsync(int houseId)
         {
             return await _context.Houses
-                .Include(h => h.HouseMembers)
+                .Include(h => h.HouseMembers.Where(hm => hm.IsActive))
                     .ThenInclude(hm => hm.User)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(h => h.Id == houseId);
@@ -46,9 +46,26 @@ namespace Persistence.Repositories
         {
             return await _context.HouseMembers
                 .AsNoTracking()
-                .Where(hm => hm.HouseId == houseId)
+                .Where(hm => hm.HouseId == houseId && hm.IsActive)
                 .Select(hm => hm.UserId)
                 .ToListAsync(ct);
+        }
+
+        public async Task<HouseMember?> GetByHouseAndUserAsync(int houseId, int userId)
+        {
+            return await _context.HouseMembers
+                .FirstOrDefaultAsync(hm => hm.HouseId == houseId && hm.UserId == userId && hm.IsActive);
+        }
+
+        public async Task UpdateAsync(HouseMember member)
+        {
+            _context.HouseMembers.Update(member);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task SaveChangesAsync()
+        {
+            await _context.SaveChangesAsync();
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using Domain.Entities;
+using Domain.Entities;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -11,6 +11,7 @@ namespace Application.Services.Repositories
         Task<House> GetByIdAsync(int id);
         Task AddMemberAsync(HouseMember member);
         Task RemoveMemberAsync(int houseId, int userId);
-
+        Task UpdateAsync(House entity);
+        Task SaveChangesAsync();
     }
 }

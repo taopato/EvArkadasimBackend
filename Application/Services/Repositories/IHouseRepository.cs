@@ -10,6 +10,7 @@ namespace Application.Services.Repositories
         Task<List<House>> GetAllAsync();
         Task<House> GetByIdAsync(int id);
         Task AddMemberAsync(HouseMember member);
+        Task<bool> IsActiveMemberAsync(int houseId, int userId);
         Task RemoveMemberAsync(int houseId, int userId);
         Task UpdateAsync(House entity);
         Task SaveChangesAsync();

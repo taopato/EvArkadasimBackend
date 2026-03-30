@@ -18,6 +18,8 @@ namespace Persistence.Migrations
                 """
 IF OBJECT_ID(N'[Payments]', N'U') IS NOT NULL
 BEGIN
+    DECLARE @NotDefaultConstraint NVARCHAR(128);
+
     IF COL_LENGTH('Payments', 'Aciklama') IS NULL
         ALTER TABLE [Payments] ADD [Aciklama] NVARCHAR(MAX) NULL;
 
@@ -28,6 +30,16 @@ BEGIN
             WHEN [Aciklama] IS NULL OR LTRIM(RTRIM([Aciklama])) = '' THEN [Not]
             ELSE [Aciklama]
         END;
+
+        SELECT @NotDefaultConstraint = dc.name
+        FROM sys.default_constraints dc
+        INNER JOIN sys.columns c
+            ON c.default_object_id = dc.object_id
+        WHERE dc.parent_object_id = OBJECT_ID(N'[Payments]')
+          AND c.name = 'Not';
+
+        IF @NotDefaultConstraint IS NOT NULL
+            EXEC(N'ALTER TABLE [Payments] DROP CONSTRAINT [' + @NotDefaultConstraint + ']');
 
         ALTER TABLE [Payments] DROP COLUMN [Not];
     END

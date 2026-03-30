@@ -13,6 +13,8 @@ namespace Persistence.Contexts
         public DbSet<Expense> Expenses { get; set; }
         public DbSet<House> Houses { get; set; }
         public DbSet<HouseMember> HouseMembers { get; set; }
+        public DbSet<HouseNoteSection> HouseNoteSections { get; set; }
+        public DbSet<HouseNoteItem> HouseNoteItems { get; set; }
         public DbSet<Invitation> Invitations { get; set; }
         public DbSet<Payment> Payments { get; set; } = null!;
         public DbSet<PersonalExpense> PersonalExpenses { get; set; }
@@ -85,6 +87,38 @@ namespace Persistence.Contexts
 
             modelBuilder.Entity<HouseMember>()
                 .HasKey(hm => new { hm.HouseId, hm.UserId });
+
+            modelBuilder.Entity<HouseNoteSection>(section =>
+            {
+                section.Property(x => x.Title).HasMaxLength(80).IsRequired();
+                section.HasOne(x => x.House)
+                    .WithMany()
+                    .HasForeignKey(x => x.HouseId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                section.HasOne(x => x.CreatedByUser)
+                    .WithMany()
+                    .HasForeignKey(x => x.CreatedByUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                section.HasMany(x => x.Items)
+                    .WithOne(x => x.Section)
+                    .HasForeignKey(x => x.SectionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                section.HasIndex(x => new { x.HouseId, x.DeletedAt, x.Title });
+            });
+
+            modelBuilder.Entity<HouseNoteItem>(item =>
+            {
+                item.Property(x => x.Content).HasMaxLength(280).IsRequired();
+                item.HasOne(x => x.CreatedByUser)
+                    .WithMany()
+                    .HasForeignKey(x => x.CreatedByUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                item.HasOne(x => x.CompletedByUser)
+                    .WithMany()
+                    .HasForeignKey(x => x.CompletedByUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                item.HasIndex(x => new { x.SectionId, x.IsCompleted, x.DeletedAt });
+            });
 
             modelBuilder.Entity<House>()
                 .HasOne(h => h.CreatorUser)

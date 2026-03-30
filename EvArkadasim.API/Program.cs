@@ -41,6 +41,7 @@ builder.Services.AddScoped<IPersonalExpenseRepository, EfPersonalExpenseReposito
 builder.Services.AddScoped<IShareRepository, EfShareRepository>();
 builder.Services.AddScoped<IPaymentRepository, EfPaymentRepository>();
 builder.Services.AddScoped<IHouseMemberRepository, EfHouseMemberRepository>();
+builder.Services.AddScoped<IHouseNoteRepository, EfHouseNoteRepository>();
 builder.Services.AddScoped<IInvitationRepository, EfInvitationRepository>();
 builder.Services.AddScoped<ILedgerLineRepository, EfLedgerLineRepository>();
 builder.Services.AddScoped<IRecurringChargeRepository, EfRecurringChargeRepository>();

@@ -39,8 +39,29 @@ namespace Persistence.Repositories
 
         public async Task AddMemberAsync(HouseMember member)
         {
-            await _context.HouseMembers.AddAsync(member);
+            var existing = await _context.HouseMembers
+                .FirstOrDefaultAsync(m => m.HouseId == member.HouseId && m.UserId == member.UserId);
+
+            if (existing == null)
+            {
+                await _context.HouseMembers.AddAsync(member);
+            }
+            else
+            {
+                existing.IsActive = true;
+                existing.LeftAt = null;
+                existing.RemovedByUserId = null;
+                existing.JoinedDate = member.JoinedDate == default ? DateTime.UtcNow : member.JoinedDate;
+                _context.HouseMembers.Update(existing);
+            }
+
             await _context.SaveChangesAsync();
+        }
+
+        public async Task<bool> IsActiveMemberAsync(int houseId, int userId)
+        {
+            return await _context.HouseMembers
+                .AnyAsync(m => m.HouseId == houseId && m.UserId == userId && m.IsActive);
         }
 
         public async Task RemoveMemberAsync(int houseId, int userId)

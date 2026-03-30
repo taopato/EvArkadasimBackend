@@ -62,96 +62,64 @@ namespace Persistence.Migrations
                 type: "int",
                 nullable: true);
 
-            migrationBuilder.CreateTable(
-                name: "Receipts",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    HouseId = table.Column<int>(type: "int", nullable: false),
-                    UploadedByUserId = table.Column<int>(type: "int", nullable: false),
-                    ImageUrl = table.Column<string>(type: "nvarchar(1024)", maxLength: 1024, nullable: false),
-                    RawOcrText = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    StoreName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
-                    ReceiptDate = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    DetectedTotalAmount = table.Column<decimal>(type: "decimal(18,2)", nullable: true),
-                    Status = table.Column<int>(type: "int", nullable: false),
-                    ConvertedExpenseId = table.Column<int>(type: "int", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Receipts", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Receipts_Houses_HouseId",
-                        column: x => x.HouseId,
-                        principalTable: "Houses",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_Receipts_Users_UploadedByUserId",
-                        column: x => x.UploadedByUserId,
-                        principalTable: "Users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
+            migrationBuilder.Sql(
+                """
+IF OBJECT_ID(N'[Receipts]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [Receipts] (
+        [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [HouseId] INT NOT NULL,
+        [UploadedByUserId] INT NOT NULL,
+        [ImageUrl] NVARCHAR(1024) NOT NULL,
+        [RawOcrText] NVARCHAR(MAX) NULL,
+        [StoreName] NVARCHAR(256) NULL,
+        [ReceiptDate] DATETIME2 NULL,
+        [DetectedTotalAmount] DECIMAL(18,2) NULL,
+        [Status] INT NOT NULL DEFAULT(0),
+        [ConvertedExpenseId] INT NULL,
+        [CreatedAt] DATETIME2 NOT NULL,
+        [UpdatedAt] DATETIME2 NULL,
+        CONSTRAINT [FK_Receipts_Houses_HouseId] FOREIGN KEY ([HouseId]) REFERENCES [Houses]([Id]) ON DELETE CASCADE,
+        CONSTRAINT [FK_Receipts_Users_UploadedByUserId] FOREIGN KEY ([UploadedByUserId]) REFERENCES [Users]([Id])
+    );
+END;
 
-            migrationBuilder.CreateTable(
-                name: "ReceiptItems",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    ReceiptId = table.Column<int>(type: "int", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
-                    Price = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
-                    Quantity = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
-                    LineTotal = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
-                    BoxLeft = table.Column<int>(type: "int", nullable: true),
-                    BoxTop = table.Column<int>(type: "int", nullable: true),
-                    BoxWidth = table.Column<int>(type: "int", nullable: true),
-                    BoxHeight = table.Column<int>(type: "int", nullable: true),
-                    IsAssigned = table.Column<bool>(type: "bit", nullable: false, defaultValue: false),
-                    IsShared = table.Column<bool>(type: "bit", nullable: false),
-                    PersonalUserId = table.Column<int>(type: "int", nullable: true),
-                    SortOrder = table.Column<int>(type: "int", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ReceiptItems", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_ReceiptItems_Receipts_ReceiptId",
-                        column: x => x.ReceiptId,
-                        principalTable: "Receipts",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Receipts_HouseId' AND object_id = OBJECT_ID(N'[Receipts]'))
+    CREATE INDEX [IX_Receipts_HouseId] ON [Receipts]([HouseId]);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_ReceiptItems_ReceiptId",
-                table: "ReceiptItems",
-                column: "ReceiptId");
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Receipts_UploadedByUserId' AND object_id = OBJECT_ID(N'[Receipts]'))
+    CREATE INDEX [IX_Receipts_UploadedByUserId] ON [Receipts]([UploadedByUserId]);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_Receipts_CreatedAt",
-                table: "Receipts",
-                column: "CreatedAt");
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Receipts_CreatedAt' AND object_id = OBJECT_ID(N'[Receipts]'))
+    CREATE INDEX [IX_Receipts_CreatedAt] ON [Receipts]([CreatedAt]);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_Receipts_HouseId",
-                table: "Receipts",
-                column: "HouseId");
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Receipts_HouseId_UploadedByUserId_CreatedAt' AND object_id = OBJECT_ID(N'[Receipts]'))
+    CREATE INDEX [IX_Receipts_HouseId_UploadedByUserId_CreatedAt] ON [Receipts]([HouseId], [UploadedByUserId], [CreatedAt]);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_Receipts_HouseId_UploadedByUserId_CreatedAt",
-                table: "Receipts",
-                columns: new[] { "HouseId", "UploadedByUserId", "CreatedAt" });
+IF OBJECT_ID(N'[ReceiptItems]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [ReceiptItems] (
+        [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [ReceiptId] INT NOT NULL,
+        [Name] NVARCHAR(256) NOT NULL,
+        [Price] DECIMAL(18,2) NOT NULL,
+        [Quantity] DECIMAL(18,2) NOT NULL,
+        [LineTotal] DECIMAL(18,2) NOT NULL,
+        [BoxLeft] INT NULL,
+        [BoxTop] INT NULL,
+        [BoxWidth] INT NULL,
+        [BoxHeight] INT NULL,
+        [IsAssigned] BIT NOT NULL DEFAULT(0),
+        [IsShared] BIT NOT NULL DEFAULT(1),
+        [PersonalUserId] INT NULL,
+        [SortOrder] INT NOT NULL DEFAULT(0),
+        CONSTRAINT [FK_ReceiptItems_Receipts_ReceiptId] FOREIGN KEY ([ReceiptId]) REFERENCES [Receipts]([Id]) ON DELETE CASCADE
+    );
+END;
 
-            migrationBuilder.CreateIndex(
-                name: "IX_Receipts_UploadedByUserId",
-                table: "Receipts",
-                column: "UploadedByUserId");
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ReceiptItems_ReceiptId' AND object_id = OBJECT_ID(N'[ReceiptItems]'))
+    CREATE INDEX [IX_ReceiptItems_ReceiptId] ON [ReceiptItems]([ReceiptId]);
+""");
         }
 
         /// <inheritdoc />

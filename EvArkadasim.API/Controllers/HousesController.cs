@@ -7,9 +7,11 @@ using Application.Features.Houses.Queries.GetUserHouses;
 using Application.Features.Invitations.Commands.SendInvitation;
 using Application.Features.Invitations.Dtos;
 using Application.Services.Repositories;
+using Domain.Entities;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -23,11 +25,19 @@ namespace WebAPI.Controllers
     {
         private readonly IMediator _mediator;
         private readonly IHouseRepository _houseRepository;
+        private readonly IInvitationRepository _invitationRepository;
+        private readonly IUserRepository _userRepository;
 
-        public HousesController(IMediator mediator, IHouseRepository houseRepository)
+        public HousesController(
+            IMediator mediator,
+            IHouseRepository houseRepository,
+            IInvitationRepository invitationRepository,
+            IUserRepository userRepository)
         {
             _mediator = mediator;
             _houseRepository = houseRepository;
+            _invitationRepository = invitationRepository;
+            _userRepository = userRepository;
         }
 
         [HttpGet("{houseId:int}")]
@@ -69,6 +79,74 @@ namespace WebAPI.Controllers
             var command = new SendInvitationCommand { HouseId = houseId, Email = request.Email };
             var result = await _mediator.Send(command);
             return Ok(result);
+        }
+
+        [HttpPost("AcceptInvitation")]
+        public async Task<IActionResult> AcceptInvitation([FromBody] AcceptInvitationRequestDto request)
+        {
+            var invitationCode = request.InvitationCode?.Trim();
+            if (string.IsNullOrWhiteSpace(invitationCode))
+            {
+                return BadRequest(new { message = "Davet kodu zorunludur." });
+            }
+
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(userIdClaim, out var userId) || userId <= 0)
+            {
+                return Unauthorized(new { message = "Gecerli kullanici kimligi bulunamadi." });
+            }
+
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
+            {
+                return Unauthorized(new { message = "Kullanici bulunamadi." });
+            }
+
+            var invitation = await _invitationRepository.GetByCodeAsync(invitationCode);
+            if (invitation == null)
+            {
+                return BadRequest(new { message = "Gecersiz davet linki." });
+            }
+
+            if (invitation.ExpiresAt.HasValue && invitation.ExpiresAt.Value < DateTime.UtcNow)
+            {
+                return BadRequest(new { message = "Davet linkinin suresi dolmustur." });
+            }
+
+            if (!string.IsNullOrWhiteSpace(invitation.Email) &&
+                !string.Equals(invitation.Email.Trim(), user.Email.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(new { message = "Bu davet farkli bir e-posta adresine gonderilmis." });
+            }
+
+            var alreadyMember = await _houseRepository.IsActiveMemberAsync(invitation.HouseId, userId);
+            if (!alreadyMember)
+            {
+                if (!string.Equals(invitation.Status, "Pending", StringComparison.OrdinalIgnoreCase))
+                {
+                    return BadRequest(new { message = "Bu davet daha once kullanilmis." });
+                }
+
+                await _houseRepository.AddMemberAsync(new HouseMember
+                {
+                    HouseId = invitation.HouseId,
+                    UserId = userId,
+                    JoinedDate = DateTime.UtcNow,
+                    IsActive = true
+                });
+            }
+
+            invitation.Status = "Accepted";
+            invitation.AcceptedByUserId = userId;
+            invitation.AcceptedAt = DateTime.UtcNow;
+            await _invitationRepository.UpdateAsync(invitation);
+
+            return Ok(new
+            {
+                success = true,
+                message = alreadyMember ? "Zaten bu evin uyesisiniz." : "Eve basariyla katildiniz.",
+                houseId = invitation.HouseId
+            });
         }
 
         [HttpGet("{houseId}/members")]

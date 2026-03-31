@@ -19,27 +19,30 @@ namespace Application.Features.Expenses.Commands.CreateExpense
         private readonly IExpenseRepository _expenseRepository;
         private readonly IHouseMemberRepository _houseMemberRepo;
         private readonly ILedgerLineRepository _ledgerRepo;
+        private readonly IShareRepository _shareRepository;
 
         public CreateExpenseCommandHandler(
             IExpenseRepository expenseRepository,
             AutoMapper.IMapper mapper,
             IHouseMemberRepository houseMemberRepo,
-            ILedgerLineRepository ledgerRepo)
+            ILedgerLineRepository ledgerRepo,
+            IShareRepository shareRepository)
         {
             _expenseRepository = expenseRepository;
             _houseMemberRepo = houseMemberRepo;
             _ledgerRepo = ledgerRepo;
+            _shareRepository = shareRepository;
         }
 
         public async Task<CreatedExpenseResponseDto> Handle(CreateExpenseCommand request, CancellationToken cancellationToken)
         {
             var mode = (request.Mode ?? "").Trim().ToLowerInvariant();
 
-            if (mode == "installment" || (request.InstallmentCount ?? 0) > 1)
-                return await HandleInstallmentAsync(request, cancellationToken);
-
             if (mode == "recurring")
                 return await HandleRecurringAsync(request, cancellationToken);
+
+            if (mode == "installment" || (request.InstallmentCount ?? 0) > 1)
+                return await HandleInstallmentAsync(request, cancellationToken);
 
             return await HandleSingleAsync(request, cancellationToken);
         }
@@ -77,18 +80,27 @@ namespace Application.Features.Expenses.Commands.CreateExpense
             if (participants.Count == 0)
                 throw new InvalidOperationException("Aktif ev üyesi bulunamadı.");
 
-            foreach (var share in BuildEqualShares(sharedAmount, participants))
-            {
-                entity.Shares.Add(new Share
-                {
-                    UserId = share.UserId,
-                    PaylasimTutar = share.Amount,
-                    PaylasimTuru = PaylasimTuru.Esit
-                });
-            }
-
             var created = await _expenseRepository.AddAsync(entity);
             await _expenseRepository.SaveChangesAsync();
+
+            var shareEntities = BuildEqualShares(sharedAmount, participants)
+                .Select(share => new Share
+                {
+                    ExpenseId = created.Id,
+                    HarcamaId = created.Id,
+                    UserId = share.UserId,
+                    PaylasimUserId = share.UserId,
+                    PaylasimTutar = share.Amount,
+                    PaylasimTuru = PaylasimTuru.Esit,
+                    Date = whenUtc
+                })
+                .ToList();
+
+            if (shareEntities.Count > 0)
+            {
+                await _shareRepository.AddRangeAsync(shareEntities);
+                await _shareRepository.SaveChangesAsync();
+            }
 
             var ledgerLines = BuildLedgerLinesForExpense(created, request.OdeyenUserId, participants, sharedAmount, personalItems);
             if (ledgerLines.Count > 0)
@@ -283,9 +295,8 @@ namespace Application.Features.Expenses.Commands.CreateExpense
                 1 => "İnternet",
                 2 => "Elektrik",
                 3 => "Su",
-                4 => "Doğalgaz",
+                4 => "Market",
                 5 => "Yemek",
-                6 => "Market",
                 99 => "Diğer",
                 _ => "Diğer"
             };
@@ -348,21 +359,31 @@ namespace Application.Features.Expenses.Commands.CreateExpense
                 child.PreShareDays = preShareDays;
                 child.PostDate = ResolveVisibilityStartUtc(dueDate, preShareDays);
 
-                foreach (var share in BuildEqualShares(monthly, participants))
-                {
-                    child.Shares.Add(new Share
-                    {
-                        UserId = share.UserId,
-                        PaylasimTutar = share.Amount,
-                        PaylasimTuru = PaylasimTuru.Esit
-                    });
-                }
-
                 child = await _expenseRepository.AddAsync(child);
                 childExpenses.Add(child);
             }
 
             await _expenseRepository.SaveChangesAsync();
+
+            var installmentShares = childExpenses
+                .SelectMany(child => BuildEqualShares(child.OrtakHarcamaTutari, participants)
+                    .Select(share => new Share
+                    {
+                        ExpenseId = child.Id,
+                        HarcamaId = child.Id,
+                        UserId = share.UserId,
+                        PaylasimUserId = share.UserId,
+                        PaylasimTutar = share.Amount,
+                        PaylasimTuru = PaylasimTuru.Esit,
+                        Date = child.DueDate ?? child.CreatedDate
+                    }))
+                .ToList();
+
+            if (installmentShares.Any())
+            {
+                await _shareRepository.AddRangeAsync(installmentShares);
+                await _shareRepository.SaveChangesAsync();
+            }
 
             var firstLedgerPostDate = ResolveVisibilityStartUtc(MonthWithDueDayUtc(startMonthUtc, dueDay), preShareDays);
             return ToResponse(parent, participants.Count, firstLedgerPostDate > DateTime.UtcNow, firstLedgerPostDate);
@@ -413,21 +434,31 @@ namespace Application.Features.Expenses.Commands.CreateExpense
                 child.PreShareDays = preShareDays;
                 child.PostDate = ResolveVisibilityStartUtc(dueDate, preShareDays);
 
-                foreach (var share in BuildEqualShares(monthlyAmount, participants))
-                {
-                    child.Shares.Add(new Share
-                    {
-                        UserId = share.UserId,
-                        PaylasimTutar = share.Amount,
-                        PaylasimTuru = PaylasimTuru.Esit
-                    });
-                }
-
                 child = await _expenseRepository.AddAsync(child);
                 childExpenses.Add(child);
             }
 
             await _expenseRepository.SaveChangesAsync();
+
+            var recurringShares = childExpenses
+                .SelectMany(child => BuildEqualShares(child.OrtakHarcamaTutari, participants)
+                    .Select(share => new Share
+                    {
+                        ExpenseId = child.Id,
+                        HarcamaId = child.Id,
+                        UserId = share.UserId,
+                        PaylasimUserId = share.UserId,
+                        PaylasimTutar = share.Amount,
+                        PaylasimTuru = PaylasimTuru.Esit,
+                        Date = child.DueDate ?? child.CreatedDate
+                    }))
+                .ToList();
+
+            if (recurringShares.Any())
+            {
+                await _shareRepository.AddRangeAsync(recurringShares);
+                await _shareRepository.SaveChangesAsync();
+            }
 
             var firstLedgerPostDate = ResolveVisibilityStartUtc(MonthWithDueDayUtc(startMonthUtc, dueDay), preShareDays);
             return ToResponse(parent, participants.Count, firstLedgerPostDate > DateTime.UtcNow, firstLedgerPostDate);

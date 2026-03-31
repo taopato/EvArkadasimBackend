@@ -174,7 +174,7 @@ namespace Application.Features.Expenses.Commands.UpdateExpense
                     FromUserId = share.UserId,
                     ToUserId = expense.OdeyenUserId,
                     Amount = share.Amount,
-                    PostDate = expense.CreatedDate,
+                    PostDate = expense.PostDate,
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow
                 });
@@ -191,7 +191,7 @@ namespace Application.Features.Expenses.Commands.UpdateExpense
                     FromUserId = personal.UserId,
                     ToUserId = expense.OdeyenUserId,
                     Amount = personal.Tutar,
-                    PostDate = expense.CreatedDate,
+                    PostDate = expense.PostDate,
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow
                 });

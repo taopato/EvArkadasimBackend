@@ -10,6 +10,7 @@ using System.Text;
 using Persistence;
 using Core.Security.JWT;
 using Application.Features.Auths.Commands.SendVerificationCode;
+using Application.Services.PlannedExpenses;
 using Microsoft.EntityFrameworkCore;
 using Persistence.Contexts;
 using Microsoft.OpenApi.Models;
@@ -46,6 +47,7 @@ builder.Services.AddScoped<IInvitationRepository, EfInvitationRepository>();
 builder.Services.AddScoped<ILedgerLineRepository, EfLedgerLineRepository>();
 builder.Services.AddScoped<IRecurringChargeRepository, EfRecurringChargeRepository>();
 builder.Services.AddScoped<IChargeCycleRepository, EfChargeCycleRepository>();
+builder.Services.AddScoped<IPlannedExpenseLedgerSyncService, PlannedExpenseLedgerSyncService>();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient<IReceiptOcrService, ReceiptOcrService>();
@@ -231,6 +233,13 @@ app.UseExceptionHandler(exceptionApp =>
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             await context.Response.WriteAsJsonAsync(new { message = unauthorizedAccessException.Message });
+            return;
+        }
+
+        if (exception is KeyNotFoundException keyNotFoundException)
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            await context.Response.WriteAsJsonAsync(new { message = keyNotFoundException.Message });
             return;
         }
 

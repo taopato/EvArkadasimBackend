@@ -70,6 +70,12 @@ namespace Application.Features.Expenses.Commands.CreateExpense
             RuleFor(x => x).CustomAsync(async (cmd, ctx, ct) =>
             {
                 var house = await houseRepo.GetByIdAsync(cmd.HouseId);
+                if (house == null)
+                {
+                    ctx.AddFailure("HouseId", "Ev grubu bulunamadi.");
+                    return;
+                }
+
                 var memberIds = house.HouseMembers.Select(m => m.UserId).ToHashSet();
 
                 foreach (var pe in cmd.SahsiHarcamalar)

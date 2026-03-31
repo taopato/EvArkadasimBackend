@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Application.Features.Houses.Dtos;
+using Application.Services.PlannedExpenses;
 using Application.Services.Repositories;
 using MediatR;
 
@@ -12,13 +13,23 @@ namespace Application.Features.Houses.Queries.GetUserDebts
     public class GetUserDebtsQueryHandler : IRequestHandler<GetUserDebtsQuery, GetUserDebtsDto>
     {
         private readonly ILedgerLineRepository _ledgerRepo;
-        public GetUserDebtsQueryHandler(ILedgerLineRepository ledgerRepo) => _ledgerRepo = ledgerRepo;
+        private readonly IPlannedExpenseLedgerSyncService _plannedExpenseLedgerSyncService;
+
+        public GetUserDebtsQueryHandler(
+            ILedgerLineRepository ledgerRepo,
+            IPlannedExpenseLedgerSyncService plannedExpenseLedgerSyncService)
+        {
+            _ledgerRepo = ledgerRepo;
+            _plannedExpenseLedgerSyncService = plannedExpenseLedgerSyncService;
+        }
 
         public async Task<GetUserDebtsDto> Handle(GetUserDebtsQuery request, CancellationToken ct)
         {
+            await _plannedExpenseLedgerSyncService.EnsureVisibleExpenseLedgersAsync(request.HouseId, ct);
+            var nowUtc = System.DateTime.UtcNow;
             // Sadece açık ve aktif satırlar
             var lines = await _ledgerRepo.GetListAsync(
-                l => l.HouseId == request.HouseId && l.IsActive && !l.IsClosed, ct);
+                l => l.HouseId == request.HouseId && l.IsActive && !l.IsClosed && l.PostDate <= nowUtc, ct);
 
             // Açık bakiye (Remaining) üstünden topla
             var pairForward = new Dictionary<(int from, int to), decimal>();

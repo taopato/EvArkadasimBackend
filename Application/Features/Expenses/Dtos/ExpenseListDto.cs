@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using Domain.Enums;
 
 namespace Application.Features.Expenses.Dtos
 {
@@ -13,15 +14,16 @@ namespace Application.Features.Expenses.Dtos
         public DateTime KayitTarihi { get; set; }
         public string OdeyenKullaniciAdi { get; set; } = string.Empty;
         public string KaydedenKullaniciAdi { get; set; } = string.Empty;
-
-        // 🔹 FE'nin notu okuyabilmesi için description alanı
         public string Description { get; set; } = string.Empty;
-
-        // 🔹 Plan/Taksit metadata (FE için gerekli)
         public int? ParentExpenseId { get; set; }
-        public int? InstallmentIndex { get; set; }     // 1-based
+        public int? InstallmentIndex { get; set; }
         public int? InstallmentCount { get; set; }
-        public DateTime? PlanStartMonth { get; set; }  // ayın 1'i UTC
-        public byte? DueDay { get; set; }              // 1–28
+        public DateTime? PlanStartMonth { get; set; }
+        public byte? DueDay { get; set; }
+        public DateTime? PostDate { get; set; }
+        public DateTime? DueDate { get; set; }
+        public short? PreShareDays { get; set; }
+        public VisibilityMode VisibilityMode { get; set; }
+        public ExpenseCategory Category { get; set; }
     }
 }

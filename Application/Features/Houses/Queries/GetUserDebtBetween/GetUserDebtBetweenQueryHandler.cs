@@ -2,6 +2,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Application.Features.Houses.Dtos;
+using Application.Services.PlannedExpenses;
 using Application.Services.Repositories;
 using MediatR;
 
@@ -10,20 +11,28 @@ namespace Application.Features.Houses.Queries.GetUserDebtBetween
     public class GetUserDebtBetweenQueryHandler : IRequestHandler<GetUserDebtBetweenQuery, PairDebtDetailDto>
     {
         private readonly ILedgerLineRepository _ledgerRepo;
+        private readonly IPlannedExpenseLedgerSyncService _plannedExpenseLedgerSyncService;
         private readonly IUserRepository _userRepo;
 
-        public GetUserDebtBetweenQueryHandler(ILedgerLineRepository ledgerRepo, IUserRepository userRepo)
+        public GetUserDebtBetweenQueryHandler(
+            ILedgerLineRepository ledgerRepo,
+            IPlannedExpenseLedgerSyncService plannedExpenseLedgerSyncService,
+            IUserRepository userRepo)
         {
             _ledgerRepo = ledgerRepo;
+            _plannedExpenseLedgerSyncService = plannedExpenseLedgerSyncService;
             _userRepo = userRepo;
         }
 
         public async Task<PairDebtDetailDto> Handle(GetUserDebtBetweenQuery request, CancellationToken ct)
         {
+            await _plannedExpenseLedgerSyncService.EnsureVisibleExpenseLedgersAsync(request.HouseId, ct);
+            var nowUtc = System.DateTime.UtcNow;
             var lines = await _ledgerRepo.GetListAsync(
                 l => l.HouseId == request.HouseId
                     && l.IsActive
                     && !l.IsClosed
+                    && l.PostDate <= nowUtc
                     && ((l.FromUserId == request.UserAId && l.ToUserId == request.UserBId)
                      || (l.FromUserId == request.UserBId && l.ToUserId == request.UserAId)),
                 ct);

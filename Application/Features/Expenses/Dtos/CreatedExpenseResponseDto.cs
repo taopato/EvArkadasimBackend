@@ -24,5 +24,8 @@ namespace Application.Features.Expenses.Dtos
         public int? InstallmentCount { get; set; }
         public DateTime? PlanStartMonth { get; set; }
         public byte? DueDay { get; set; }
+        public int ActiveParticipantCount { get; set; }
+        public bool LedgerStartsInFuture { get; set; }
+        public DateTime? FirstLedgerPostDate { get; set; }
     }
 }

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Net.Http.Json;
 
@@ -447,22 +448,46 @@ namespace EvArkadasim.API.Services.Receipts
 
         private sealed class PythonReceiptResponse
         {
+            [JsonPropertyName("raw_text")]
             public string? RawText { get; set; }
+
+            [JsonPropertyName("store_name")]
             public string? StoreName { get; set; }
+
+            [JsonPropertyName("receipt_date")]
             public DateTime? ReceiptDate { get; set; }
+
+            [JsonPropertyName("total_amount")]
             public decimal? TotalAmount { get; set; }
+
+            [JsonPropertyName("items")]
             public List<PythonReceiptItem>? Items { get; set; }
         }
 
         private sealed class PythonReceiptItem
         {
+            [JsonPropertyName("name")]
             public string? Name { get; set; }
+
+            [JsonPropertyName("price")]
             public decimal Price { get; set; }
+
+            [JsonPropertyName("quantity")]
             public decimal Quantity { get; set; }
+
+            [JsonPropertyName("line_total")]
             public decimal LineTotal { get; set; }
+
+            [JsonPropertyName("box_left")]
             public int? BoxLeft { get; set; }
+
+            [JsonPropertyName("box_top")]
             public int? BoxTop { get; set; }
+
+            [JsonPropertyName("box_width")]
             public int? BoxWidth { get; set; }
+
+            [JsonPropertyName("box_height")]
             public int? BoxHeight { get; set; }
         }
     }

@@ -42,16 +42,30 @@ namespace Persistence.Repositories
             => _ctx.LedgerLines.Where(predicate).AsNoTracking().ToListAsync(ct);
 
         public Task<List<LedgerLine>> GetOpenDebtsAsync(int houseId, int userId, CancellationToken ct = default)
-            => _ctx.LedgerLines
-                   .Where(x => x.HouseId == houseId && x.FromUserId == userId && x.IsActive && !x.IsClosed)
+        {
+            var nowUtc = DateTime.UtcNow;
+            return _ctx.LedgerLines
+                   .Where(x => x.HouseId == houseId
+                            && x.FromUserId == userId
+                            && x.IsActive
+                            && !x.IsClosed
+                            && x.PostDate <= nowUtc)
                    .AsNoTracking()
                    .ToListAsync(ct);
+        }
 
         public Task<List<LedgerLine>> GetOpenCreditsAsync(int houseId, int userId, CancellationToken ct = default)
-            => _ctx.LedgerLines
-                   .Where(x => x.HouseId == houseId && x.ToUserId == userId && x.IsActive && !x.IsClosed)
+        {
+            var nowUtc = DateTime.UtcNow;
+            return _ctx.LedgerLines
+                   .Where(x => x.HouseId == houseId
+                            && x.ToUserId == userId
+                            && x.IsActive
+                            && !x.IsClosed
+                            && x.PostDate <= nowUtc)
                    .AsNoTracking()
                    .ToListAsync(ct);
+        }
 
         public Task<List<LedgerLine>> ListOpenForPairAsync(
             int houseId, int fromUserId, int toUserId, DateTime asOf, CancellationToken ct = default)
@@ -61,7 +75,7 @@ namespace Persistence.Repositories
                             && x.ToUserId == toUserId
                             && x.IsActive
                             && !x.IsClosed
-                            && x.CreatedAt <= asOf)
+                            && x.PostDate <= asOf)
                    .OrderBy(x => x.Id) // FIFO
                    .AsNoTracking()
                    .ToListAsync(ct);

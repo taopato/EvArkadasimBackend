@@ -97,7 +97,7 @@ namespace Application.Features.Expenses.Commands.CreateExpense
                 await _ledgerRepo.SaveChangesAsync(ct);
             }
 
-            return ToResponse(created);
+            return ToResponse(created, participants.Count, false, created.CreatedDate);
         }
 
         private static List<PersonalExpenseDto> NormalizePersonalItems(IEnumerable<PersonalExpenseDto>? items)
@@ -155,7 +155,7 @@ namespace Application.Features.Expenses.Commands.CreateExpense
                     FromUserId = kvp.Key,
                     ToUserId = payerUserId,
                     Amount = kvp.Value,
-                    PostDate = expense.CreatedDate,
+                    PostDate = expense.PostDate,
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow
                 });
@@ -172,7 +172,7 @@ namespace Application.Features.Expenses.Commands.CreateExpense
                     FromUserId = personal.UserId,
                     ToUserId = payerUserId,
                     Amount = personal.Tutar,
-                    PostDate = expense.CreatedDate,
+                    PostDate = expense.PostDate,
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow
                 });
@@ -191,16 +191,21 @@ namespace Application.Features.Expenses.Commands.CreateExpense
             return new DateTime(monthFirstUtc.Year, monthFirstUtc.Month, day, 0, 0, 0, DateTimeKind.Utc);
         }
 
+        private static DateTime ResolveVisibilityStartUtc(DateTime dueDateUtc, short preShareDays)
+            => dueDateUtc.AddDays(-Math.Max(0, (int)preShareDays));
+
         private Expense BuildBaseExpense(CreateExpenseCommand request, string title, ExpenseCategory category, DateTime whenUtc)
         {
             var description = request.Aciklama ?? request.Note ?? request.Description;
+            var payerUserId = request.OdeyenUserId > 0 ? request.OdeyenUserId : request.KaydedenUserId;
+            var creatorUserId = request.KaydedenUserId > 0 ? request.KaydedenUserId : payerUserId;
 
             return new Expense
             {
                 Tur = title,
                 HouseId = request.HouseId,
-                OdeyenUserId = request.OdeyenUserId,
-                KaydedenUserId = request.KaydedenUserId,
+                OdeyenUserId = payerUserId,
+                KaydedenUserId = creatorUserId,
                 CreatedDate = whenUtc,
                 IsActive = true,
                 Description = description,
@@ -291,6 +296,7 @@ namespace Application.Features.Expenses.Commands.CreateExpense
             var total = request.Tutar;
             var count = Math.Max(1, request.InstallmentCount ?? 1);
             var dueDay = (byte)Math.Clamp((int)(request.DueDay ?? 1), 1, 28);
+            const short preShareDays = 5;
 
             var startBase = request.StartMonth?.ToUniversalTime()
                          ?? (request.Date == default ? DateTime.UtcNow : request.Date.ToUniversalTime());
@@ -327,8 +333,8 @@ namespace Application.Features.Expenses.Commands.CreateExpense
             for (int i = 0; i < count; i++)
             {
                 var monthFirst = FirstDayUtc(startMonthUtc.AddMonths(i));
-                var postDate = MonthWithDueDayUtc(monthFirst, dueDay);
-                var child = BuildBaseExpense(request, $"{title} taksit {i + 1}/{count}", cat, postDate);
+                var dueDate = MonthWithDueDayUtc(monthFirst, dueDay);
+                var child = BuildBaseExpense(request, $"{title} taksit {i + 1}/{count}", cat, dueDate);
                 child.ParentExpenseId = parent.Id;
                 child.Tutar = monthly;
                 child.OrtakHarcamaTutari = monthly;
@@ -337,6 +343,10 @@ namespace Application.Features.Expenses.Commands.CreateExpense
                 child.InstallmentIndex = i + 1;
                 child.InstallmentCount = count;
                 child.Type = ExpenseType.Regular;
+                child.DueDate = dueDate;
+                child.VisibilityMode = VisibilityMode.BeforeDueByDays;
+                child.PreShareDays = preShareDays;
+                child.PostDate = ResolveVisibilityStartUtc(dueDate, preShareDays);
 
                 foreach (var share in BuildEqualShares(monthly, participants))
                 {
@@ -353,15 +363,16 @@ namespace Application.Features.Expenses.Commands.CreateExpense
             }
 
             await _expenseRepository.SaveChangesAsync();
-            await CreateEqualLedgersForMaturedAsync(request.HouseId, childExpenses, participants, cardholderId, monthly, ct);
 
-            return ToResponse(parent);
+            var firstLedgerPostDate = ResolveVisibilityStartUtc(MonthWithDueDayUtc(startMonthUtc, dueDay), preShareDays);
+            return ToResponse(parent, participants.Count, firstLedgerPostDate > DateTime.UtcNow, firstLedgerPostDate);
         }
 
         private async Task<CreatedExpenseResponseDto> HandleRecurringAsync(CreateExpenseCommand request, CancellationToken ct)
         {
             var monthlyAmount = request.Tutar;
             var dueDay = (byte)Math.Clamp((int)(request.DueDay ?? 1), 1, 28);
+            const short preShareDays = 5;
 
             var startBase = request.StartMonth?.ToUniversalTime()
                          ?? (request.Date == default ? DateTime.UtcNow : request.Date.ToUniversalTime());
@@ -389,14 +400,18 @@ namespace Application.Features.Expenses.Commands.CreateExpense
             for (int i = 0; i < RECURRING_HORIZON_MONTHS; i++)
             {
                 var monthFirst = FirstDayUtc(startMonthUtc.AddMonths(i));
-                var postDate = MonthWithDueDayUtc(monthFirst, dueDay);
-                var child = BuildBaseExpense(request, title, cat, postDate);
+                var dueDate = MonthWithDueDayUtc(monthFirst, dueDay);
+                var child = BuildBaseExpense(request, title, cat, dueDate);
                 child.ParentExpenseId = parent.Id;
                 child.Tutar = monthlyAmount;
                 child.OrtakHarcamaTutari = monthlyAmount;
                 child.DueDay = dueDay;
                 child.PlanStartMonth = startMonthUtc;
                 child.Type = ExpenseType.Regular;
+                child.DueDate = dueDate;
+                child.VisibilityMode = VisibilityMode.BeforeDueByDays;
+                child.PreShareDays = preShareDays;
+                child.PostDate = ResolveVisibilityStartUtc(dueDate, preShareDays);
 
                 foreach (var share in BuildEqualShares(monthlyAmount, participants))
                 {
@@ -413,34 +428,16 @@ namespace Application.Features.Expenses.Commands.CreateExpense
             }
 
             await _expenseRepository.SaveChangesAsync();
-            await CreateEqualLedgersForMaturedAsync(request.HouseId, childExpenses, participants, request.OdeyenUserId, monthlyAmount, ct);
 
-            return ToResponse(parent);
+            var firstLedgerPostDate = ResolveVisibilityStartUtc(MonthWithDueDayUtc(startMonthUtc, dueDay), preShareDays);
+            return ToResponse(parent, participants.Count, firstLedgerPostDate > DateTime.UtcNow, firstLedgerPostDate);
         }
 
-        private async Task CreateEqualLedgersForMaturedAsync(
-            int houseId,
-            List<Expense> children,
-            List<int> participants,
-            int collectorUserId,
-            decimal monthlyAmount,
-            CancellationToken ct)
-        {
-            var nowUtc = DateTime.UtcNow;
-            var matured = children.Where(c => c.CreatedDate <= nowUtc).ToList();
-            if (matured.Count == 0) return;
-
-            foreach (var exp in matured)
-            {
-                var lines = BuildLedgerLinesForExpense(exp, collectorUserId, participants, monthlyAmount, new List<PersonalExpenseDto>());
-                if (lines.Count > 0)
-                    await _ledgerRepo.AddRangeAsync(lines, ct);
-            }
-
-            await _ledgerRepo.SaveChangesAsync(ct);
-        }
-
-        private static CreatedExpenseResponseDto ToResponse(Expense created)
+        private static CreatedExpenseResponseDto ToResponse(
+            Expense created,
+            int activeParticipantCount,
+            bool ledgerStartsInFuture,
+            DateTime? firstLedgerPostDate)
         {
             return new CreatedExpenseResponseDto
             {
@@ -456,7 +453,10 @@ namespace Application.Features.Expenses.Commands.CreateExpense
                 InstallmentIndex = created.InstallmentIndex,
                 InstallmentCount = created.InstallmentCount,
                 PlanStartMonth = created.PlanStartMonth,
-                DueDay = created.DueDay
+                DueDay = created.DueDay,
+                ActiveParticipantCount = activeParticipantCount,
+                LedgerStartsInFuture = ledgerStartsInFuture,
+                FirstLedgerPostDate = firstLedgerPostDate
             };
         }
     }

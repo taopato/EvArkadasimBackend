@@ -40,6 +40,11 @@ namespace Application.Features.Expenses.Queries.GetExpensesByHouse
                 dto.OdeyenKullaniciAdi = payer is null ? "" : $"{payer.FirstName} {payer.LastName}";
                 dto.KaydedenKullaniciAdi = creator is null ? "" : $"{creator.FirstName} {creator.LastName}";
                 dto.KayitTarihi = e.CreatedDate;
+                dto.PostDate = e.PostDate;
+                dto.DueDate = e.DueDate;
+                dto.PreShareDays = e.PreShareDays;
+                dto.VisibilityMode = e.VisibilityMode;
+                dto.Category = e.Category;
 
                 // 🔹 Notu description'a yansıt
                 if (string.IsNullOrWhiteSpace(dto.Description))

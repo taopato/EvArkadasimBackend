@@ -1,7 +1,13 @@
-﻿using AutoMapper;
-using MediatR;
-using Application.Services.Repositories;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Application.Features.Houses.Dtos;
+using Application.Services.PlannedExpenses;
+using Application.Services.Repositories;
+using AutoMapper;
+using MediatR;
 
 namespace Application.Features.Houses.Queries.GetHouseMembersWithDebts
 {
@@ -9,16 +15,19 @@ namespace Application.Features.Houses.Queries.GetHouseMembersWithDebts
         : IRequestHandler<GetHouseMembersWithDebtsQuery, List<MemberDebtDto>>
     {
         private readonly IHouseRepository _houseRepo;
-        private readonly IPaymentRepository _paymentRepo;
+        private readonly ILedgerLineRepository _ledgerRepo;
         private readonly IMapper _mapper;
+        private readonly IPlannedExpenseLedgerSyncService _plannedExpenseLedgerSyncService;
 
         public GetHouseMembersWithDebtsQueryHandler(
             IHouseRepository houseRepo,
-            IPaymentRepository paymentRepo,
+            ILedgerLineRepository ledgerRepo,
+            IPlannedExpenseLedgerSyncService plannedExpenseLedgerSyncService,
             IMapper mapper)
         {
             _houseRepo = houseRepo;
-            _paymentRepo = paymentRepo;
+            _ledgerRepo = ledgerRepo;
+            _plannedExpenseLedgerSyncService = plannedExpenseLedgerSyncService;
             _mapper = mapper;
         }
 
@@ -26,16 +35,26 @@ namespace Application.Features.Houses.Queries.GetHouseMembersWithDebts
             GetHouseMembersWithDebtsQuery request,
             CancellationToken cancellationToken)
         {
-            // 1) Ev üyelerini al
+            var nowUtc = DateTime.UtcNow;
+            await _plannedExpenseLedgerSyncService.EnsureVisibleExpenseLedgersAsync(request.HouseId, cancellationToken);
             var house = await _houseRepo.GetByIdAsync(request.HouseId);
+            var visibleLines = await _ledgerRepo.GetListAsync(
+                l => l.HouseId == request.HouseId
+                    && l.IsActive
+                    && !l.IsClosed
+                    && l.PostDate <= nowUtc,
+                cancellationToken);
 
-            // 2) Her üye için alacak ve borç tutarlarını hesapla
             var result = new List<MemberDebtDto>();
-            foreach (var member in house.HouseMembers)
+            foreach (var member in house.HouseMembers.Where(hm => hm.IsActive))
             {
                 var uid = member.UserId;
-                var alacak = await _paymentRepo.GetTotalAlacaklıAsync(request.HouseId, uid);
-                var borc = await _paymentRepo.GetTotalBorçluAsync(request.HouseId, uid);
+                var alacak = visibleLines
+                    .Where(l => l.ToUserId == uid)
+                    .Sum(l => l.Amount - l.PaidAmount);
+                var borc = visibleLines
+                    .Where(l => l.FromUserId == uid)
+                    .Sum(l => l.Amount - l.PaidAmount);
 
                 result.Add(new MemberDebtDto
                 {

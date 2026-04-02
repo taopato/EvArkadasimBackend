@@ -13,6 +13,7 @@ namespace Application.Services.Repositories
         Task<bool> IsActiveMemberAsync(int houseId, int userId);
         Task RemoveMemberAsync(int houseId, int userId);
         Task UpdateAsync(House entity);
+        Task DeleteAsync(int houseId);
         Task SaveChangesAsync();
     }
 }

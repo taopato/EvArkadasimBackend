@@ -1,4 +1,5 @@
 using Application.Features.Houses.Commands.CreateHouse;
+using Application.Features.Houses.Commands.DeleteHouse;
 using Application.Features.Houses.Commands.LeaveHouse;
 using Application.Features.Houses.Queries.GetHouseMembersWithDebts;
 using Application.Features.Houses.Queries.GetUserDebtBetween;
@@ -156,17 +157,65 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
-        /// <summary>DELETE /api/Houses/{houseId}/members/{userId}?requestingUserId=123 — Soft delete</summary>
         [HttpDelete("{houseId}/members/{userId}")]
-        public async Task<IActionResult> RemoveMember(int houseId, int userId, [FromQuery] int requestingUserId)
+        public async Task<IActionResult> RemoveMember(int houseId, int userId)
         {
-            await _mediator.Send(new LeaveHouseCommand
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(userIdClaim, out var requestingUserId) || requestingUserId <= 0)
+                return Unauthorized(new { message = "Gecerli kullanici kimligi bulunamadi." });
+
+            try
             {
-                HouseId = houseId,
-                UserId = userId,
-                RequestingUserId = requestingUserId
-            });
-            return Ok(new { success = true, message = "Üye evden çıkarıldı." });
+                await _mediator.Send(new LeaveHouseCommand
+                {
+                    HouseId = houseId,
+                    UserId = userId,
+                    RequestingUserId = requestingUserId
+                });
+                return Ok(new { success = true, message = "Uye evden cikarildi." });
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound(new { message = "Kullanici veya ev bulunamadi." });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpDelete("{houseId:int}")]
+        public async Task<IActionResult> DeleteHouse(int houseId)
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(userIdClaim, out var requestingUserId) || requestingUserId <= 0)
+                return Unauthorized(new { message = "Gecerli kullanici kimligi bulunamadi." });
+
+            try
+            {
+                await _mediator.Send(new DeleteHouseCommand
+                {
+                    HouseId = houseId,
+                    RequestingUserId = requestingUserId
+                });
+                return Ok(new { success = true, message = "Ev grubu silindi." });
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound(new { message = "Ev bulunamadi." });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { message = ex.Message });
+            }
         }
 
         [HttpGet("GetUserHouses/{userId}")]

@@ -39,6 +39,11 @@ namespace Application.Features.Expenses.Commands.UpdateExpense
             var expense = await _repo.GetByIdAsync(request.ExpenseId)
                 ?? throw new KeyNotFoundException("Expense not found");
 
+            if (request.Dto.Tutar <= 0)
+                throw new InvalidOperationException("Harcama tutarı sıfırdan büyük olmalıdır.");
+            if (string.IsNullOrWhiteSpace(request.Dto.Tur))
+                throw new InvalidOperationException("Harcama adı boş bırakılamaz.");
+
             var paidLines = await _ledgerRepo.GetListAsync(
                 l => l.ExpenseId == expense.Id && l.IsActive && l.PaidAmount > 0m,
                 ct);
@@ -54,18 +59,43 @@ namespace Application.Features.Expenses.Commands.UpdateExpense
             var sharedAmount = request.Dto.OrtakHarcamaTutari > 0
                 ? request.Dto.OrtakHarcamaTutari
                 : Math.Max(0m, request.Dto.Tutar - personalTotal);
+            if (Math.Abs((sharedAmount + personalTotal) - request.Dto.Tutar) > 0.01m)
+                throw new InvalidOperationException("Ortak ve kişisel payların toplamı harcama tutarına eşit olmalıdır.");
+
+            var participants = (await _houseMemberRepo.GetActiveUserIdsAsync(expense.HouseId, ct))
+                .Distinct()
+                .OrderBy(id => id)
+                .ToList();
+            if (participants.Count == 0)
+                throw new InvalidOperationException("Aktif ev üyesi bulunamadı.");
+            if (personalItems.Any(item => !participants.Contains(item.UserId)))
+                throw new InvalidOperationException("Kişisel harcamalar yalnızca aktif ev üyelerine atanabilir.");
 
             expense.Tur = request.Dto.Tur;
             expense.Tutar = request.Dto.Tutar;
             expense.OrtakHarcamaTutari = sharedAmount;
             expense.SplitPolicy = personalItems.Count > 0 ? PaylasimTuru.KisiBazli : PaylasimTuru.Esit;
 
+            if (request.Dto.Category.HasValue)
+                expense.Category = request.Dto.Category.Value;
+            if (request.Dto.PostDate.HasValue)
+                expense.PostDate = request.Dto.PostDate.Value;
+            if (request.Dto.DueDate.HasValue)
+                expense.DueDate = request.Dto.DueDate.Value;
+            if (request.Dto.OdeyenUserId.HasValue)
+            {
+                if (!participants.Contains(request.Dto.OdeyenUserId.Value))
+                    throw new InvalidOperationException("Ödeyen kişi bu evin aktif bir üyesi olmalıdır.");
+                expense.OdeyenUserId = request.Dto.OdeyenUserId.Value;
+            }
+            else if (!participants.Contains(expense.OdeyenUserId))
+            {
+                throw new InvalidOperationException("Mevcut ödeyen kişi artık bu evin aktif bir üyesi değil.");
+            }
+
             var incomingDesc = request.Dto.Aciklama ?? request.Dto.Note ?? request.Dto.Description;
             if (!string.IsNullOrWhiteSpace(incomingDesc))
-            {
-                expense.Description = incomingDesc;
                 expense.Note = incomingDesc;
-            }
 
             await _repo.UpdateAsync(expense);
 
@@ -84,11 +114,6 @@ namespace Application.Features.Expenses.Commands.UpdateExpense
                     Tutar = personal.Tutar
                 });
             }
-
-            var participants = (await _houseMemberRepo.GetActiveUserIdsAsync(expense.HouseId, ct))
-                .Distinct()
-                .OrderBy(id => id)
-                .ToList();
 
             foreach (var share in BuildEqualShares(sharedAmount, participants))
             {

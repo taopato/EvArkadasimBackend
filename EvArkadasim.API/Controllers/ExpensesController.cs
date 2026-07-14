@@ -8,6 +8,9 @@ using Application.Features.Expenses.Queries.GetExpensesByHouse;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Persistence.Contexts;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace WebAPI.Controllers
@@ -18,15 +21,21 @@ namespace WebAPI.Controllers
     public class ExpensesController : ControllerBase
     {
         private readonly IMediator _mediator;
+        private readonly AppDbContext _dbContext;
 
-        public ExpensesController(IMediator mediator)
+        public ExpensesController(IMediator mediator, AppDbContext dbContext)
         {
             _mediator = mediator;
+            _dbContext = dbContext;
         }
 
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateExpenseCommand command)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null) return Unauthorized();
+            if (!await CanAccessHouseAsync(command.HouseId, currentUserId.Value)) return Forbid();
+            command.KaydedenUserId = currentUserId.Value;
             CreatedExpenseResponseDto result = await _mediator.Send(command);
             return Ok(result);
         }
@@ -34,6 +43,10 @@ namespace WebAPI.Controllers
         [HttpPost("AddExpense")]
         public async Task<IActionResult> AddExpense([FromBody] CreateExpenseCommand command)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null) return Unauthorized();
+            if (!await CanAccessHouseAsync(command.HouseId, currentUserId.Value)) return Forbid();
+            command.KaydedenUserId = currentUserId.Value;
             CreatedExpenseResponseDto result = await _mediator.Send(command);
             return Ok(result);
         }
@@ -41,6 +54,9 @@ namespace WebAPI.Controllers
         [HttpGet("GetExpenses/{houseId}")]
         public async Task<IActionResult> GetExpenses(int houseId)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null) return Unauthorized();
+            if (!await CanAccessHouseAsync(houseId, currentUserId.Value)) return Forbid();
             var data = await _mediator.Send(new GetExpensesByHouseQuery { HouseId = houseId });
             return Ok(new { isSuccess = true, data });
         }
@@ -48,6 +64,9 @@ namespace WebAPI.Controllers
         [HttpGet("GetExpense/{expenseId}")]
         public async Task<IActionResult> GetExpense(int expenseId)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null) return Unauthorized();
+            if (!await CanAccessExpenseAsync(expenseId, currentUserId.Value)) return Forbid();
             var data = await _mediator.Send(new GetExpenseQuery { ExpenseId = expenseId });
             return Ok(new { isSuccess = true, data });
         }
@@ -55,6 +74,9 @@ namespace WebAPI.Controllers
         [HttpDelete("DeleteExpense/{expenseId}")]
         public async Task<IActionResult> DeleteExpense(int expenseId)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null) return Unauthorized();
+            if (!await CanAccessExpenseAsync(expenseId, currentUserId.Value)) return Forbid();
             await _mediator.Send(new DeleteExpenseCommand { ExpenseId = expenseId });
             return Ok(new { isSuccess = true, message = "Harcama başarıyla silindi." });
         }
@@ -62,6 +84,9 @@ namespace WebAPI.Controllers
         [HttpPut("UpdateExpense/{expenseId}")]
         public async Task<IActionResult> UpdateExpense(int expenseId, [FromBody] UpdateExpenseDto dto)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null) return Unauthorized();
+            if (!await CanAccessExpenseAsync(expenseId, currentUserId.Value)) return Forbid();
             await _mediator.Send(new UpdateExpenseCommand
             {
                 ExpenseId = expenseId,
@@ -73,8 +98,36 @@ namespace WebAPI.Controllers
         [HttpPost("CreateIrregular")]
         public async Task<IActionResult> CreateIrregular([FromBody] CreateIrregularExpenseRequest model)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null) return Unauthorized();
+            if (!await CanAccessHouseAsync(model.HouseId, currentUserId.Value)) return Forbid();
+            model.KaydedenUserId = currentUserId.Value;
             var result = await _mediator.Send(new CreateIrregularExpenseCommand { Model = model });
             return Ok(result);
+        }
+
+        private int? GetCurrentUserId()
+        {
+            var raw = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value;
+            return int.TryParse(raw, out var userId) && userId > 0 ? userId : null;
+        }
+
+        private Task<bool> CanAccessHouseAsync(int houseId, int userId)
+        {
+            return _dbContext.HouseMembers
+                .AsNoTracking()
+                .AnyAsync(member => member.HouseId == houseId && member.UserId == userId && member.IsActive);
+        }
+
+        private async Task<bool> CanAccessExpenseAsync(int expenseId, int userId)
+        {
+            var houseId = await _dbContext.Expenses
+                .AsNoTracking()
+                .Where(expense => expense.Id == expenseId && expense.IsActive)
+                .Select(expense => (int?)expense.HouseId)
+                .FirstOrDefaultAsync();
+            return houseId.HasValue && await CanAccessHouseAsync(houseId.Value, userId);
         }
     }
 }

@@ -1,7 +1,6 @@
 ﻿using MediatR;
 using Application.Features.Expenses.Dtos;
 using Application.Services.Repositories;
-using AutoMapper;
 using Domain.Entities;
 
 namespace Application.Features.Expenses.Queries.GetExpense
@@ -10,17 +9,14 @@ namespace Application.Features.Expenses.Queries.GetExpense
         : IRequestHandler<GetExpenseQuery, ExpenseDetailDto>
     {
         private readonly IExpenseRepository _repo;
-        private readonly IMapper _mapper;
         private readonly IUserRepository _userRepo;
 
         public GetExpenseQueryHandler(
             IExpenseRepository repo,
-            IUserRepository userRepo,
-            IMapper mapper)
+            IUserRepository userRepo)
         {
             _repo = repo;
             _userRepo = userRepo;
-            _mapper = mapper;
         }
 
         public async Task<ExpenseDetailDto> Handle(
@@ -34,7 +30,7 @@ namespace Application.Features.Expenses.Queries.GetExpense
             if (!e.IsActive)
                 throw new KeyNotFoundException("Expense not found");
 
-            var dto = _mapper.Map<ExpenseDetailDto>(e);
+            var dto = ExpenseDtoMapper.ToDetailDto(e);
 
             // Kullanıcı adları
             var payer = await _userRepo.GetByIdAsync(e.OdeyenUserId);

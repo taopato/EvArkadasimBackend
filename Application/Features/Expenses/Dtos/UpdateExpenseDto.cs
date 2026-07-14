@@ -7,6 +7,10 @@ namespace Application.Features.Expenses.Dtos
         public string Tur { get; set; } = string.Empty;
         public decimal Tutar { get; set; }
         public decimal OrtakHarcamaTutari { get; set; }
+        public Domain.Enums.ExpenseCategory? Category { get; set; }
+        public System.DateTime? PostDate { get; set; }
+        public System.DateTime? DueDate { get; set; }
+        public int? OdeyenUserId { get; set; }
 
         // Şahsi kalemler
         public List<PersonalExpenseDto> SahsiHarcamalar { get; set; } = new();

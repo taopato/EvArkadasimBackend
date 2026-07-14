@@ -32,13 +32,30 @@ namespace Application.Features.Expenses.Commands.CreateIrregularExpense
         {
             var m = request.Model;
 
+            if (string.IsNullOrWhiteSpace(m.Tur))
+                throw new InvalidOperationException("Harcama adı boş bırakılamaz.");
+            if (m.Tutar <= 0)
+                throw new InvalidOperationException("Harcama tutarı sıfırdan büyük olmalıdır.");
+            if (m.Note?.Length > 512)
+                throw new InvalidOperationException("Harcama notu en fazla 512 karakter olabilir.");
+
+            m.Tur = m.Tur.Trim();
+            m.Note = string.IsNullOrWhiteSpace(m.Note) ? null : m.Note.Trim();
+
             var members = await _houseMemberRepo.GetActiveUserIdsAsync(m.HouseId, ct);
             if (members == null || members.Count == 0)
                 throw new InvalidOperationException("Aktif ev üyesi bulunamadı.");
+            if (!members.Contains(m.KaydedenUserId))
+                throw new InvalidOperationException("Harcamayı kaydeden kişi aktif bir ev üyesi olmalıdır.");
+            if (!members.Contains(m.OdeyenUserId))
+                throw new InvalidOperationException("Ödeyen kişi aktif bir ev üyesi olmalıdır.");
 
             var personalMap = (m.PersonalItems ?? new List<PersonalItemDto>())
+                                .Where(x => x.Amount > 0)
                                 .GroupBy(x => x.UserId)
                                 .ToDictionary(g => g.Key, g => g.Sum(x => x.Amount));
+            if (personalMap.Keys.Any(userId => !members.Contains(userId)))
+                throw new InvalidOperationException("Kişisel harcamalar yalnızca aktif ev üyelerine atanabilir.");
             var personalTotal = personalMap.Values.Sum();
             if (personalTotal > m.Tutar)
                 throw new InvalidOperationException("Kişisel toplam, toplam tutardan büyük olamaz.");

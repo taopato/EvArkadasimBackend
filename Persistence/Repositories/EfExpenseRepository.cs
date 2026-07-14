@@ -66,7 +66,11 @@ namespace Persistence.Repositories
 
         public async Task<Expense?> GetByIdAsync(int id)
         {
-            return await _context.Expenses.FirstOrDefaultAsync(e => e.Id == id && e.IsActive);
+            return await _context.Expenses
+                .Include(e => e.PersonalExpenses)
+                    .ThenInclude(pe => pe.User)
+                .Include(e => e.Shares)
+                .FirstOrDefaultAsync(e => e.Id == id && e.IsActive);
         }
 
         public async Task DeleteAsync(Expense entity)

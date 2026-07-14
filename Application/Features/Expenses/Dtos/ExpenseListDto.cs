@@ -15,6 +15,7 @@ namespace Application.Features.Expenses.Dtos
         public string OdeyenKullaniciAdi { get; set; } = string.Empty;
         public string KaydedenKullaniciAdi { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
+        public string? Note { get; set; }
         public int? ParentExpenseId { get; set; }
         public int? InstallmentIndex { get; set; }
         public int? InstallmentCount { get; set; }

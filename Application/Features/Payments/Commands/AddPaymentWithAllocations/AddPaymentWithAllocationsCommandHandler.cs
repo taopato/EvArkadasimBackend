@@ -39,7 +39,7 @@ namespace Application.Features.Payments.Commands.AddPaymentWithAllocations
                 AlacakliUserId = m.AlacakliUserId,
                 Tutar = m.Tutar,
                 PaymentMethod = PaymentMethod.BankTransfer,
-                DekontUrl = m.DekontUrl,
+                DekontUrl = m.DekontUrl ?? string.Empty,
                 OdemeTarihi = odemeTarihi,
                 Aciklama = m.Aciklama,
                 ChargeId = m.ChargeId,

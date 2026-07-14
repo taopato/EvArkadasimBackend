@@ -1,7 +1,6 @@
 ﻿using MediatR;
 using Application.Features.Payments.Dtos;
 using Application.Services.Repositories;
-using AutoMapper;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,14 +11,10 @@ namespace Application.Features.Payments.Queries.GetPaymentList
         : IRequestHandler<GetPaymentListQuery, List<PaymentDto>>
     {
         private readonly IPaymentRepository _paymentRepo;
-        private readonly IMapper _mapper;
 
-        public GetPaymentListQueryHandler(
-            IPaymentRepository paymentRepo,
-            IMapper mapper)
+        public GetPaymentListQueryHandler(IPaymentRepository paymentRepo)
         {
             _paymentRepo = paymentRepo;
-            _mapper = mapper;
         }
 
         public async Task<List<PaymentDto>> Handle(
@@ -27,7 +22,25 @@ namespace Application.Features.Payments.Queries.GetPaymentList
             CancellationToken cancellationToken)
         {
             var list = await _paymentRepo.GetByHouseIdAsync(request.HouseId);
-            return _mapper.Map<List<PaymentDto>>(list);
+            return list.Select(payment => new PaymentDto
+            {
+                Id = payment.Id,
+                HouseId = payment.HouseId,
+                BorcluUserId = payment.BorcluUserId,
+                AlacakliUserId = payment.AlacakliUserId,
+                Tutar = payment.Tutar,
+                CreatedDate = payment.CreatedDate,
+                PaymentMethod = payment.PaymentMethod.ToString(),
+                Status = payment.Status.ToString(),
+                BorcluUserName = payment.BorcluUser is null
+                    ? string.Empty
+                    : $"{payment.BorcluUser.FirstName} {payment.BorcluUser.LastName}".Trim(),
+                AlacakliUserName = payment.AlacakliUser is null
+                    ? string.Empty
+                    : $"{payment.AlacakliUser.FirstName} {payment.AlacakliUser.LastName}".Trim(),
+                Aciklama = payment.Aciklama,
+                OdemeTarihi = payment.OdemeTarihi
+            }).ToList();
         }
     }
 }

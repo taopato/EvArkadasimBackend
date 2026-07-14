@@ -8,6 +8,7 @@
         Water = 3,
         Market = 4,
         Food = 5,
+        Gas = 6,
         Other = 99
     }
 }

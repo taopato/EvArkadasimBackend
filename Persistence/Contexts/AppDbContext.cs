@@ -63,12 +63,14 @@ namespace Persistence.Contexts
                 // Enum int olarak saklanır, default BankTransfer
                 pb.Property(p => p.PaymentMethod)
                   .HasConversion<int>()
-                  .HasDefaultValue(PaymentMethod.BankTransfer);
+                  .HasDefaultValue(PaymentMethod.BankTransfer)
+                  .HasSentinel((PaymentMethod)0);
 
                 // PaymentStatus enum mapping
                 pb.Property(p => p.Status)
                   .HasConversion<int>()
-                  .HasDefaultValue(PaymentStatus.Pending);
+                  .HasDefaultValue(PaymentStatus.Pending)
+                  .HasSentinel((PaymentStatus)0);
 
                 pb.Property(p => p.DekontUrl).HasMaxLength(400);
             });

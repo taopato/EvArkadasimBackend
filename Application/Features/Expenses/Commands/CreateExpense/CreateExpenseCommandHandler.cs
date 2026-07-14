@@ -23,7 +23,6 @@ namespace Application.Features.Expenses.Commands.CreateExpense
 
         public CreateExpenseCommandHandler(
             IExpenseRepository expenseRepository,
-            AutoMapper.IMapper mapper,
             IHouseMemberRepository houseMemberRepo,
             ILedgerLineRepository ledgerRepo,
             IShareRepository shareRepository)
@@ -218,7 +217,7 @@ namespace Application.Features.Expenses.Commands.CreateExpense
                 KaydedenUserId = creatorUserId,
                 CreatedDate = whenUtc,
                 IsActive = true,
-                Description = description,
+                Description = description ?? string.Empty,
                 Note = request.Note ?? request.Aciklama ?? request.Description,
                 PostDate = whenUtc,
                 DueDate = whenUtc,

@@ -5,9 +5,9 @@ namespace Core.Utilities.Results
     {
         public T Data { get; }
         public bool Success { get; }
-        public string Message { get; }
+        public string? Message { get; }
 
-        public Response(T data, bool success, string message = null)
+        public Response(T data, bool success, string? message = null)
         {
             Data = data;
             Success = success;

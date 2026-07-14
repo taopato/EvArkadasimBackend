@@ -59,6 +59,9 @@ namespace Application.Features.Auths.Commands.AppleLogin
                 Id = user.Id,
                 Email = user.Email,
                 FullName = $"{user.FirstName} {user.LastName}".Trim(),
+                PhoneNumber = user.PhoneNumber,
+                Iban = user.Iban,
+                ProfileImageUrl = user.ProfileImageUrl,
                 Token = accessToken.Token,
                 Message = "Giriş başarılı!"
             };

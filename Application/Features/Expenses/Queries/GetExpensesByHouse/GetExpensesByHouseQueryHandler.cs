@@ -1,7 +1,6 @@
 ﻿using MediatR;
 using Application.Features.Expenses.Dtos;
 using Application.Services.Repositories;
-using AutoMapper;
 
 namespace Application.Features.Expenses.Queries.GetExpensesByHouse
 {
@@ -9,17 +8,14 @@ namespace Application.Features.Expenses.Queries.GetExpensesByHouse
         : IRequestHandler<GetExpensesByHouseQuery, List<ExpenseListDto>>
     {
         private readonly IExpenseRepository _repo;
-        private readonly IMapper _mapper;
         private readonly IUserRepository _userRepo;
 
         public GetExpensesByHouseQueryHandler(
             IExpenseRepository repo,
-            IUserRepository userRepo,
-            IMapper mapper)
+            IUserRepository userRepo)
         {
             _repo = repo;
             _userRepo = userRepo;
-            _mapper = mapper;
         }
 
         public async Task<List<ExpenseListDto>> Handle(
@@ -33,7 +29,7 @@ namespace Application.Features.Expenses.Queries.GetExpensesByHouse
                 // 🔹 Soft-deleted olanları listeleme
                 if (!e.IsActive) continue;
 
-                var dto = _mapper.Map<ExpenseListDto>(e);
+                var dto = ExpenseDtoMapper.ToListDto(e);
                 var payer = await _userRepo.GetByIdAsync(e.OdeyenUserId);
                 var creator = await _userRepo.GetByIdAsync(e.KaydedenUserId);
 

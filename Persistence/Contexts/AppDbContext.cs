@@ -83,8 +83,6 @@ namespace Persistence.Contexts
             modelBuilder.Entity<Share>(sb =>
             {
                 sb.Property(s => s.PaylasimTutar).HasPrecision(18, 2);
-                sb.Property(s => s.HarcamaId).HasColumnName("HarcamaId");
-                sb.Property(s => s.PaylasimUserId).HasColumnName("PaylasimUserId");
                 sb.Property(s => s.Date).HasColumnName("Date");
                 sb.HasOne(s => s.Expense)
                   .WithMany(e => e.Shares)

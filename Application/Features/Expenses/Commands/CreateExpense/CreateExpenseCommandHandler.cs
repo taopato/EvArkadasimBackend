@@ -87,9 +87,7 @@ namespace Application.Features.Expenses.Commands.CreateExpense
                 .Select(share => new Share
                 {
                     ExpenseId = created.Id,
-                    HarcamaId = created.Id,
                     UserId = share.UserId,
-                    PaylasimUserId = share.UserId,
                     PaylasimTutar = share.Amount,
                     PaylasimTuru = PaylasimTuru.Esit,
                     Date = whenUtc
@@ -370,9 +368,7 @@ namespace Application.Features.Expenses.Commands.CreateExpense
                     .Select(share => new Share
                     {
                         ExpenseId = child.Id,
-                        HarcamaId = child.Id,
                         UserId = share.UserId,
-                        PaylasimUserId = share.UserId,
                         PaylasimTutar = share.Amount,
                         PaylasimTuru = PaylasimTuru.Esit,
                         Date = child.DueDate ?? child.CreatedDate
@@ -445,9 +441,7 @@ namespace Application.Features.Expenses.Commands.CreateExpense
                     .Select(share => new Share
                     {
                         ExpenseId = child.Id,
-                        HarcamaId = child.Id,
                         UserId = share.UserId,
-                        PaylasimUserId = share.UserId,
                         PaylasimTutar = share.Amount,
                         PaylasimTuru = PaylasimTuru.Esit,
                         Date = child.DueDate ?? child.CreatedDate

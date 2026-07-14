@@ -189,8 +189,19 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
-    EnsureReceiptTables(db);
+    var skipMigrations = string.Equals(
+        Environment.GetEnvironmentVariable("EVARKADASIM_SKIP_MIGRATIONS"),
+        "true",
+        StringComparison.OrdinalIgnoreCase);
+
+    if (!skipMigrations)
+    {
+        db.Database.Migrate();
+    }
+    if (!skipMigrations)
+    {
+        EnsureReceiptTables(db);
+    }
 }
 
 // 9) Pipeline

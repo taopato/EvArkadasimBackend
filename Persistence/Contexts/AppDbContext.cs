@@ -31,6 +31,7 @@ namespace Persistence.Contexts
 
         public DbSet<RecurringCharge> RecurringCharges { get; set; } = null!;
         public DbSet<ChargeCycle> ChargeCycles { get; set; } = null!;
+        public DbSet<ChargeCycleShare> ChargeCycleShares { get; set; } = null!;
         public DbSet<Receipt> Receipts { get; set; } = null!;
         public DbSet<ReceiptItem> ReceiptItems { get; set; } = null!;
 
@@ -214,6 +215,9 @@ namespace Persistence.Contexts
                 b.Property(x => x.Type).HasConversion<int>();
                 b.Property(x => x.AmountMode).HasConversion<int>();
                 b.Property(x => x.SplitPolicy).HasConversion<int>();
+                b.Property(x => x.AccountingMode).HasConversion<int>();
+                b.Property(x => x.Title).HasMaxLength(120);
+                b.Property(x => x.ParticipantsJson).HasMaxLength(2000);
                 b.Property(x => x.FixedAmount).HasPrecision(18, 2);
             });
 
@@ -224,6 +228,18 @@ namespace Persistence.Contexts
                 b.HasIndex(x => new { x.ContractId, x.Period }).IsUnique();
                 b.Property(x => x.TotalAmount).HasPrecision(18, 2);
                 b.Property(x => x.FundedAmount).HasPrecision(18, 2);
+            });
+
+            modelBuilder.Entity<ChargeCycleShare>(b =>
+            {
+                b.HasKey(x => x.Id);
+                b.Property(x => x.Status).HasConversion<int>();
+                b.Property(x => x.Amount).HasPrecision(18, 2);
+                b.HasIndex(x => new { x.ChargeCycleId, x.UserId }).IsUnique();
+                b.HasOne(x => x.ChargeCycle)
+                    .WithMany(x => x.Shares)
+                    .HasForeignKey(x => x.ChargeCycleId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<Payment>(b =>

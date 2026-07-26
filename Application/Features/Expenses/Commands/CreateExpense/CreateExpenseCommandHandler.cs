@@ -91,6 +91,9 @@ namespace Application.Features.Expenses.Commands.CreateExpense
                 ? requestedParticipants
                 : activeMembers;
 
+            if (personalItems.Any(item => !participants.Contains(item.UserId)))
+                throw new InvalidOperationException("Kişisel kalem yalnızca seçilen katılımcılara eklenebilir.");
+
             var created = await _expenseRepository.AddAsync(entity);
             await _expenseRepository.SaveChangesAsync();
 

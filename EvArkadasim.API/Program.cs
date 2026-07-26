@@ -5,7 +5,6 @@ using Application.Common.Behaviors;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
-using System.Net;
 using System.Text;
 using Persistence;
 using Core.Security.JWT;
@@ -131,7 +130,7 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "EvArkadasim API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Roomora API", Version = "v1" });
 
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
@@ -205,19 +204,19 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.KnownProxies.Clear();
 });
 
-// 7) Kestrel: HTTP 5118 + HTTPS 7118
+// 7) Kestrel: TLS is terminated by the production reverse proxy.
 builder.WebHost.ConfigureKestrel(options =>
 {
-    if (builder.Environment.IsDevelopment())
-    {
-        options.ListenAnyIP(5118); // Local/mobile development
-    }
-    else
-    {
-        options.Listen(IPAddress.Loopback, 5118); // Production: only local reverse proxy can reach API
-    }
+    // The API is not published directly in production, but it must listen on
+    // every container interface so the reverse proxy can reach it.
+    options.ListenAnyIP(5118);
 
-    if (builder.Environment.IsDevelopment())
+    var runningInContainer = string.Equals(
+        Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"),
+        "true",
+        StringComparison.OrdinalIgnoreCase);
+
+    if (builder.Environment.IsDevelopment() && !runningInContainer)
     {
         options.ListenAnyIP(7118, listen => listen.UseHttps()); // Local development HTTPS
     }
@@ -225,21 +224,25 @@ builder.WebHost.ConfigureKestrel(options =>
 
 var app = builder.Build();
 
-// 8) Otomatik migration
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    var skipMigrations = string.Equals(
-        Environment.GetEnvironmentVariable("EVARKADASIM_SKIP_MIGRATIONS"),
-        "true",
-        StringComparison.OrdinalIgnoreCase);
+// 8) Schema changes are explicit in production so blue-green instances can
+// start without racing each other. Run the image with --migrate-only first.
+var migrateOnly = args.Contains("--migrate-only", StringComparer.OrdinalIgnoreCase);
+var shouldMigrate = app.Environment.IsDevelopment() ||
+    migrateOnly ||
+    builder.Configuration.GetValue<bool>("Database:RunMigrations");
 
-    if (!skipMigrations)
-    {
-        db.Database.Migrate();
-    }
+if (shouldMigrate)
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
     EnsureProfileColumns(db);
     EnsureReceiptTables(db);
+}
+
+if (migrateOnly)
+{
+    return;
 }
 
 // 9) Pipeline
@@ -313,6 +316,28 @@ app.UseCors(RemoteTestCorsPolicy);
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapGet("/health", async (AppDbContext db, CancellationToken cancellationToken) =>
+{
+    var databaseAvailable = await db.Database.CanConnectAsync(cancellationToken);
+    return databaseAvailable
+        ? Results.Ok(new
+        {
+            status = "healthy",
+            service = "roomora-api",
+            database = "available",
+            timestamp = DateTimeOffset.UtcNow
+        })
+        : Results.Json(
+            new
+            {
+                status = "unhealthy",
+                service = "roomora-api",
+                database = "unavailable",
+                timestamp = DateTimeOffset.UtcNow
+            },
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+}).AllowAnonymous();
 
 app.MapControllers();
 

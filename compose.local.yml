@@ -1,0 +1,55 @@
+name: roomora-local
+
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-Roomora_Local_2026!}
+    ports:
+      - "127.0.0.1:${ROOMORA_SQL_PORT:-14330}:1433"
+    volumes:
+      - roomora_sql_data:/var/opt/mssql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  ocr:
+    build:
+      context: ../EvArkadasimOcr
+    ports:
+      - "127.0.0.1:8008:8008"
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Server=db,1433;Database=RoomoraDb;User Id=sa;Password=${MSSQL_SA_PASSWORD:-Roomora_Local_2026!};TrustServerCertificate=True;Encrypt=False
+      TokenOptions__SecurityKey: ${TOKEN_SECURITY_KEY:-ROOMORA_LOCAL_ONLY_SECURITY_KEY_CHANGE_BEFORE_PRODUCTION_2026}
+      TokenOptions__Issuer: roomora-local
+      TokenOptions__Audience: roomora-local
+      TokenOptions__AccessTokenExpiration: 60
+      ReceiptOcr__PythonServiceUrl: http://ocr:8008
+      Database__RunMigrations: "true"
+    ports:
+      - "5118:5118"
+    volumes:
+      - roomora_uploads:/app/wwwroot/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      ocr:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  roomora_sql_data:
+  roomora_uploads:

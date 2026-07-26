@@ -1,0 +1,102 @@
+name: roomora-production
+
+x-api: &api
+  image: ${ROOMORA_API_IMAGE}:${ROOMORA_IMAGE_TAG}
+  environment: &api-environment
+    ASPNETCORE_ENVIRONMENT: Production
+    ConnectionStrings__DefaultConnection: Server=db,1433;Database=${ROOMORA_DB_NAME};User Id=sa;Password=${MSSQL_SA_PASSWORD};Encrypt=True;TrustServerCertificate=True
+    TokenOptions__SecurityKey: ${TOKEN_SECURITY_KEY}
+    TokenOptions__Issuer: ${TOKEN_ISSUER}
+    TokenOptions__Audience: ${TOKEN_AUDIENCE}
+    TokenOptions__AccessTokenExpiration: ${TOKEN_EXPIRATION_MINUTES:-60}
+    SmtpSettings__Server: ${SMTP_SERVER}
+    SmtpSettings__Port: ${SMTP_PORT:-587}
+    SmtpSettings__SenderEmail: ${SMTP_SENDER_EMAIL}
+    SmtpSettings__Password: ${SMTP_PASSWORD}
+    GoogleAuth__ClientIds__0: ${GOOGLE_CLIENT_ID}
+    AppleAuth__BundleId: ${APPLE_BUNDLE_ID:-com.taopato.roomora}
+    ReceiptOcr__PythonServiceUrl: http://ocr:8008
+    Cors__AllowedOrigins__0: ${ROOMORA_WEB_ORIGIN}
+    AppUrls__WebBaseUrl: ${ROOMORA_WEB_ORIGIN}
+    AppUrls__PublicApiBaseUrl: https://${ROOMORA_DOMAIN}
+    Database__RunMigrations: "false"
+  volumes:
+    - roomora_uploads:/app/wwwroot/uploads
+  networks:
+    - internal
+  depends_on:
+    db:
+      condition: service_healthy
+    ocr:
+      condition: service_healthy
+  restart: unless-stopped
+  stop_grace_period: 30s
+
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: ${MSSQL_PID:-Express}
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+    volumes:
+      - roomora_sql_data:/var/opt/mssql
+      - ${ROOMORA_BACKUP_PATH:-/opt/roomora/backups}:/var/opt/mssql/backup
+    networks:
+      - internal
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  ocr:
+    image: ${ROOMORA_OCR_IMAGE}:${ROOMORA_OCR_IMAGE_TAG}
+    networks:
+      - internal
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8008/health')
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  api-blue:
+    <<: *api
+
+  api-green:
+    <<: *api
+
+  caddy:
+    image: caddy:2.10-alpine
+    environment:
+      ROOMORA_DOMAIN: ${ROOMORA_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - roomora_caddy_data:/data
+      - roomora_caddy_config:/config
+    networks:
+      - internal
+    restart: unless-stopped
+
+networks:
+  internal:
+    name: roomora_internal
+
+volumes:
+  roomora_sql_data:
+  roomora_uploads:
+  roomora_caddy_data:
+  roomora_caddy_config:

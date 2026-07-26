@@ -1,0 +1,65 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "GHCR image tag (for example sha-012345...)"
+        required: true
+        default: latest
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout deployment files
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.SERVER_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Update deployment scripts
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          ssh "$SERVER_USER@$SERVER_HOST" "mkdir -p /opt/roomora/deploy"
+          scp deploy/compose.production.yml deploy/deploy.sh deploy/rollback.sh \
+            deploy/backup-db.sh deploy/restore-db.sh \
+            "$SERVER_USER@$SERVER_HOST:/opt/roomora/deploy/"
+          ssh "$SERVER_USER@$SERVER_HOST" \
+            "chmod +x /opt/roomora/deploy/deploy.sh \
+              /opt/roomora/deploy/rollback.sh \
+              /opt/roomora/deploy/backup-db.sh \
+              /opt/roomora/deploy/restore-db.sh"
+
+      - name: Deploy blue-green release
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          GHCR_USER: ${{ secrets.GHCR_USER }}
+          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          if [[ ! "$IMAGE_TAG" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+            echo "Gecersiz image etiketi." >&2
+            exit 1
+          fi
+          # shellcheck disable=SC2029
+          printf '%s' "$GHCR_READ_TOKEN" | ssh "$SERVER_USER@$SERVER_HOST" \
+            "docker login ghcr.io --username '$GHCR_USER' --password-stdin"
+          # shellcheck disable=SC2029
+          ssh "$SERVER_USER@$SERVER_HOST" \
+            "cd /opt/roomora/deploy && ./backup-db.sh && ./deploy.sh '$IMAGE_TAG'"

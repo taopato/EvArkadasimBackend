@@ -24,3 +24,6 @@ jobs:
 
       - name: Build
         run: dotnet build EvArkadasim.sln --configuration Release --no-restore
+
+      - name: Build Docker image
+        run: docker build --tag roomora-backend:ci .

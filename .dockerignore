@@ -1,0 +1,15 @@
+.git
+.github
+.vs
+**/bin
+**/obj
+**/*Backup*.csproj
+publish-linux
+TestResults
+*.bak
+*.log
+.env
+.env.*
+!.env.example
+EvArkadasim.API/appsettings.Local.json
+EvArkadasim.API/wwwroot/uploads

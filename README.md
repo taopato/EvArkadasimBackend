@@ -39,6 +39,15 @@ Tekrar calistirilabilir temel API kontrolu:
 .\scripts\smoke-test.ps1 -Email <test-email> -Password <test-password> -UserId <id> -HouseId <id>
 ```
 
+Tum bagimliliklari Docker ile calistirmak:
+
+```powershell
+docker compose -f compose.local.yml up --build
+```
+
+Blue-green production yayini, rollback ve yedekleme akisi icin
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) belgesine bakin.
+
 ## Uretim
 
 - Tum `CHANGE_ME` degerlerini ortam degiskenleriyle saglayin.

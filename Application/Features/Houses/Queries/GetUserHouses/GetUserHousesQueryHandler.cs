@@ -30,6 +30,7 @@ namespace Application.Features.Houses.Queries.GetUserHouses
                 {
                     Id = hm.House.Id,
                     Name = hm.House.Name,
+                    CoverImageUrl = hm.House.CoverImageUrl,
                     CreatorUserId = hm.House.CreatorUserId,
                     CreatorFullName = hm.House.CreatorUser != null
                         ? $"{hm.House.CreatorUser.FirstName} {hm.House.CreatorUser.LastName}"

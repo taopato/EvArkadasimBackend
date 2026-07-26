@@ -376,3 +376,4 @@ FodyWeavers.xsd
 !.env.example
 EvArkadasim.API/appsettings.Local.json
 EvArkadasim.API/appsettings.Production.json
+EvArkadasim.API/.expo/

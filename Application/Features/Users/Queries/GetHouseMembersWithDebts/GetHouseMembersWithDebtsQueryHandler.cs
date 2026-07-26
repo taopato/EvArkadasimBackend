@@ -57,6 +57,7 @@ namespace Application.Features.Houses.Queries.GetHouseMembersWithDebts
                     UserId = uid,
                     FullName = $"{member.User.FirstName} {member.User.LastName}",
                     Email = member.User.Email,
+                    ProfileImageUrl = member.User.ProfileImageUrl,
                     Alacak = alacak,
                     Borc = borc
                 });

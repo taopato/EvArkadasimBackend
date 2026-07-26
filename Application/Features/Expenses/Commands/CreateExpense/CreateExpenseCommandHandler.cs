@@ -71,13 +71,25 @@ namespace Application.Features.Expenses.Commands.CreateExpense
                 });
             }
 
-            var participants = (await _houseMemberRepo.GetActiveUserIdsAsync(request.HouseId, ct))
+            var activeMembers = (await _houseMemberRepo.GetActiveUserIdsAsync(request.HouseId, ct))
                 .Distinct()
                 .OrderBy(id => id)
                 .ToList();
 
-            if (participants.Count == 0)
+            if (activeMembers.Count == 0)
                 throw new InvalidOperationException("Aktif ev üyesi bulunamadı.");
+
+            var requestedParticipants = (request.Participants ?? new List<int>())
+                .Where(id => id > 0)
+                .Distinct()
+                .OrderBy(id => id)
+                .ToList();
+            if (requestedParticipants.Any(id => !activeMembers.Contains(id)))
+                throw new InvalidOperationException("Seçilen katılımcılardan biri bu evin aktif üyesi değil.");
+
+            var participants = requestedParticipants.Count > 0
+                ? requestedParticipants
+                : activeMembers;
 
             var created = await _expenseRepository.AddAsync(entity);
             await _expenseRepository.SaveChangesAsync();

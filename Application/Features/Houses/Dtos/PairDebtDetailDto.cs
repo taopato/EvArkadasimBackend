@@ -1,5 +1,13 @@
 namespace Application.Features.Houses.Dtos
 {
+    public class PairExpenseItemDto
+    {
+        public int ExpenseId { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+        public System.DateTime Date { get; set; }
+    }
+
     public class PairDebtDetailDto
     {
         public int HouseId { get; set; }
@@ -15,5 +23,6 @@ namespace Application.Features.Houses.Dtos
         public decimal NetAmount { get; set; }
         public decimal Net { get; set; }
         public int NetForUserId { get; set; }
+        public System.Collections.Generic.List<PairExpenseItemDto> RecentExpenses { get; set; } = new();
     }
 }

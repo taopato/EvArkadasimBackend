@@ -71,9 +71,6 @@ public class RecurringChargesController : ControllerBase
             return BadRequest(new { message = "Aylık tutar sıfırdan büyük olmalıdır." });
         if (request.DueDay is < 1 or > 28)
             return BadRequest(new { message = "Son ödeme günü 1-28 arasında olmalıdır." });
-        if (request.CollectionStartDay < 1 || request.CollectionStartDay > request.DueDay)
-            return BadRequest(new { message = "Tahsilat başlangıcı son ödeme gününden sonra olamaz." });
-
         var activeMembers = await _db.HouseMembers
             .AsNoTracking()
             .Where(x => x.HouseId == request.HouseId && x.IsActive)
@@ -109,8 +106,8 @@ public class RecurringChargesController : ControllerBase
             SplitPolicy = SplitPolicy.Equal,
             ParticipantsJson = JsonSerializer.Serialize(participants),
             DueDay = request.DueDay,
-            CollectionStartDay = request.CollectionStartDay,
-            PaymentWindowDays = request.DueDay - request.CollectionStartDay,
+            CollectionStartDay = Math.Max(1, request.DueDay - 5),
+            PaymentWindowDays = Math.Min(5, request.DueDay - 1),
             AccountingMode = RecurringAccountingMode.ScheduledCollection,
             StartMonth = startMonth,
             IsActive = true,
@@ -175,16 +172,16 @@ public class RecurringChargesController : ControllerBase
         foreach (var cycle in cycles)
         {
             var plan = cycle.Contract;
-            if (currentUserId.Value == plan.PayerUserId || !TryGetCollectionStart(cycle.Period, plan.CollectionStartDay, out var collectionStart))
+            var canonicalStartDay = Math.Max(1, (plan.DueDay ?? 1) - 5);
+            if (currentUserId.Value == plan.PayerUserId || !TryGetCollectionStart(cycle.Period, canonicalStartDay, out var collectionStart))
                 continue;
             if (DateOnly.FromDateTime(now.DateTime) < collectionStart) continue;
+            var dueDate = new DateOnly(collectionStart.Year, collectionStart.Month, plan.DueDay ?? 28);
+            if (DateOnly.FromDateTime(now.DateTime) > dueDate) continue;
 
             var share = cycle.Shares.FirstOrDefault(x => x.UserId == currentUserId.Value);
             if (share is null || share.Status == ChargeCycleShareStatus.Paid)
                 continue;
-
-            if (DateOnly.FromDateTime(now.DateTime) > new DateOnly(collectionStart.Year, collectionStart.Month, plan.DueDay ?? 28))
-                share.Status = ChargeCycleShareStatus.Overdue;
 
             items.Add(new ScheduledDueItemDto
             {
@@ -196,7 +193,7 @@ public class RecurringChargesController : ControllerBase
                 Amount = share.Amount,
                 Status = share.Status.ToString(),
                 DueDay = plan.DueDay ?? 28,
-                CollectionStartDay = plan.CollectionStartDay,
+                CollectionStartDay = canonicalStartDay,
                 PayerUserId = plan.PayerUserId,
                 PayerName = names.GetValueOrDefault(plan.PayerUserId, "Ödeme sorumlusu"),
             });
@@ -384,7 +381,8 @@ public class RecurringChargesController : ControllerBase
                 cycle.FundedAmount,
                 externalPaid = cycle.PaidDate.HasValue,
                 cycle.PaidDate,
-                isCollectionOpen = now.Day >= plan.CollectionStartDay,
+                isCollectionOpen = now.Day >= Math.Max(1, (plan.DueDay ?? 1) - 5)
+                    && now.Day <= (plan.DueDay ?? 28),
                 isOverdue = now.Day > (plan.DueDay ?? 28) && !cycle.PaidDate.HasValue,
                 paidCount = shares.Count(x => x.status == ChargeCycleShareStatus.Paid.ToString()),
                 totalShareCount = shares.Count,
@@ -405,7 +403,7 @@ public class RecurringChargesController : ControllerBase
             plan.PayerUserId,
             payerName = names.GetValueOrDefault(plan.PayerUserId, "Ödeme sorumlusu"),
             dueDay = plan.DueDay ?? 1,
-            plan.CollectionStartDay,
+            collectionStartDay = Math.Max(1, (plan.DueDay ?? 1) - 5),
             plan.StartMonth,
             isPayer = currentUserId == plan.PayerUserId,
             cycle = cycleDto,

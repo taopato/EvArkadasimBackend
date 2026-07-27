@@ -1,0 +1,136 @@
+name: roomora-server
+
+x-api: &api
+  environment: &api-environment
+    ASPNETCORE_ENVIRONMENT: Production
+    TokenOptions__SecurityKey: ${TOKEN_SECURITY_KEY}
+    TokenOptions__Issuer: ${TOKEN_ISSUER}
+    TokenOptions__Audience: ${TOKEN_AUDIENCE}
+    TokenOptions__AccessTokenExpiration: ${TOKEN_EXPIRATION_MINUTES:-60}
+    SmtpSettings__Server: ${SMTP_SERVER}
+    SmtpSettings__Port: ${SMTP_PORT:-587}
+    SmtpSettings__SenderEmail: ${SMTP_SENDER_EMAIL}
+    SmtpSettings__Password: ${SMTP_PASSWORD}
+    GoogleAuth__ClientIds__0: ${GOOGLE_CLIENT_ID}
+    AppleAuth__BundleId: ${APPLE_BUNDLE_ID:-com.taopato.roomora}
+    ReceiptOcr__PythonServiceUrl: http://ocr:8008
+    Database__RunMigrations: "false"
+  networks:
+    - roomora_internal
+  depends_on:
+    db:
+      condition: service_healthy
+    ocr:
+      condition: service_healthy
+  restart: unless-stopped
+  stop_grace_period: 30s
+
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: ${MSSQL_PID:-Express}
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+      MSSQL_MEMORY_LIMIT_MB: ${MSSQL_MEMORY_LIMIT_MB:-2048}
+    volumes:
+      - roomora_sql_data:/var/opt/mssql
+      - ${ROOMORA_BACKUP_PATH:-/opt/roomora/backups}:/var/opt/mssql/backup
+    networks:
+      - roomora_internal
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  ocr:
+    image: ${ROOMORA_OCR_IMAGE}
+    networks:
+      - roomora_internal
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8008/health')
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 60s
+    restart: unless-stopped
+
+  api-production-blue:
+    <<: *api
+    image: ${ROOMORA_API_REPOSITORY}:${ROOMORA_PRODUCTION_IMAGE_TAG}
+    environment:
+      <<: *api-environment
+      ConnectionStrings__DefaultConnection: Server=db,1433;Database=${ROOMORA_PRODUCTION_DB_NAME};User Id=sa;Password=${MSSQL_SA_PASSWORD};Encrypt=True;TrustServerCertificate=True
+      Cors__AllowedOrigins__0: ${ROOMORA_WEB_ORIGIN}
+      AppUrls__WebBaseUrl: ${ROOMORA_WEB_ORIGIN}
+      AppUrls__PublicApiBaseUrl: https://${ROOMORA_PRODUCTION_DOMAIN}
+    volumes:
+      - roomora_production_uploads:/app/wwwroot/uploads
+
+  api-production-green:
+    <<: *api
+    image: ${ROOMORA_API_REPOSITORY}:${ROOMORA_PRODUCTION_IMAGE_TAG}
+    environment:
+      <<: *api-environment
+      ConnectionStrings__DefaultConnection: Server=db,1433;Database=${ROOMORA_PRODUCTION_DB_NAME};User Id=sa;Password=${MSSQL_SA_PASSWORD};Encrypt=True;TrustServerCertificate=True
+      Cors__AllowedOrigins__0: ${ROOMORA_WEB_ORIGIN}
+      AppUrls__WebBaseUrl: ${ROOMORA_WEB_ORIGIN}
+      AppUrls__PublicApiBaseUrl: https://${ROOMORA_PRODUCTION_DOMAIN}
+    volumes:
+      - roomora_production_uploads:/app/wwwroot/uploads
+
+  api-staging-blue:
+    <<: *api
+    image: ${ROOMORA_API_REPOSITORY}:${ROOMORA_STAGING_IMAGE_TAG}
+    environment:
+      <<: *api-environment
+      ConnectionStrings__DefaultConnection: Server=db,1433;Database=${ROOMORA_STAGING_DB_NAME};User Id=sa;Password=${MSSQL_SA_PASSWORD};Encrypt=True;TrustServerCertificate=True
+      Cors__AllowedOrigins__0: ${ROOMORA_STAGING_WEB_ORIGIN}
+      AppUrls__WebBaseUrl: ${ROOMORA_STAGING_WEB_ORIGIN}
+      AppUrls__PublicApiBaseUrl: https://${ROOMORA_STAGING_DOMAIN}
+    volumes:
+      - roomora_staging_uploads:/app/wwwroot/uploads
+
+  api-staging-green:
+    <<: *api
+    image: ${ROOMORA_API_REPOSITORY}:${ROOMORA_STAGING_IMAGE_TAG}
+    environment:
+      <<: *api-environment
+      ConnectionStrings__DefaultConnection: Server=db,1433;Database=${ROOMORA_STAGING_DB_NAME};User Id=sa;Password=${MSSQL_SA_PASSWORD};Encrypt=True;TrustServerCertificate=True
+      Cors__AllowedOrigins__0: ${ROOMORA_STAGING_WEB_ORIGIN}
+      AppUrls__WebBaseUrl: ${ROOMORA_STAGING_WEB_ORIGIN}
+      AppUrls__PublicApiBaseUrl: https://${ROOMORA_STAGING_DOMAIN}
+    volumes:
+      - roomora_staging_uploads:/app/wwwroot/uploads
+
+  gateway:
+    image: caddy:2.10-alpine
+    volumes:
+      - ./Caddyfile.roomora:/etc/caddy/Caddyfile:ro
+    networks:
+      roomora_internal:
+      builtwhys_proxy:
+        aliases:
+          - roomora-gateway
+    restart: unless-stopped
+
+networks:
+  roomora_internal:
+    name: roomora_internal
+  builtwhys_proxy:
+    external: true
+    name: builtwhys_default
+
+volumes:
+  roomora_sql_data:
+  roomora_production_uploads:
+  roomora_staging_uploads:

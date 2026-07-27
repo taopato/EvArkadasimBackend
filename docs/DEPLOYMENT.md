@@ -11,6 +11,34 @@
 7. Health check basariliysa Caddy trafigi yeni yuvaya kesintisiz aktarir.
 8. Sorunda `rollback.sh` onceki container'a geri doner.
 
+## Roomora Sunucusu Branch Akisi
+
+Roomora'nin paylasimli sunucu kurulumu `compose.shared-server.yml` kullanir:
+
+- `development` push'u image yayinlandiktan sonra `testapi.roomora.com`
+  staging ortaminda blue-green deploy edilir.
+- `main` push'u image yayinlandiktan sonra `api.roomora.com` production
+  ortaminda blue-green deploy edilir.
+- Iki ortam ayri `RoomoraDb` ve `RoomoraStagingDb` veritabanlarini kullanir.
+- SQL Server ve OCR altyapisi kaynak kullanimi icin ortaktir; uygulama
+  verileri ve yuklenen dosyalar ortam bazinda ayridir.
+- SQL Server disariya port acmaz. Dis trafik mevcut sunucu Caddy'sinden
+  Roomora gateway'e, oradan aktif API slotuna gider.
+
+Sunucuda:
+
+```bash
+cd /opt/roomora/deploy
+./deploy-environment.sh staging <image-tag>
+./deploy-environment.sh production <image-tag>
+./rollback-environment.sh staging
+./rollback-environment.sh production
+./backup-shared-db.sh
+```
+
+GitHub Actions icin ayri `roomora-deploy` SSH kullanicisi kullanilir. Kisisel
+SSH anahtari CI sistemine kopyalanmaz.
+
 ## Local Docker
 
 Docker Desktop calisirken backend repo kokunde:

@@ -1,0 +1,98 @@
+name: Deploy Server Environment
+
+on:
+  workflow_run:
+    workflows: ["Publish Backend Image"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-staging:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'development'
+    runs-on: ubuntu-latest
+    environment: backend-staging
+
+    steps:
+      - name: Checkout release
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.SERVER_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Upload deployment files
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          scp deploy/compose.shared-server.yml \
+            deploy/deploy-environment.sh deploy/rollback-environment.sh \
+            deploy/backup-shared-db.sh deploy/restore-shared-db.sh \
+            "$SERVER_USER@$SERVER_HOST:/opt/roomora/deploy/"
+
+      - name: Deploy staging
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          IMAGE_TAG: sha-${{ github.event.workflow_run.head_sha }}
+        run: |
+          # shellcheck disable=SC2029
+          ssh "$SERVER_USER@$SERVER_HOST" \
+            "cd /opt/roomora/deploy &&
+             chmod +x ./*.sh &&
+             ./backup-shared-db.sh &&
+             ./deploy-environment.sh staging '$IMAGE_TAG'"
+
+  deploy-production:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    environment: backend-production
+
+    steps:
+      - name: Checkout release
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.SERVER_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Upload deployment files
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          scp deploy/compose.shared-server.yml \
+            deploy/deploy-environment.sh deploy/rollback-environment.sh \
+            deploy/backup-shared-db.sh deploy/restore-shared-db.sh \
+            "$SERVER_USER@$SERVER_HOST:/opt/roomora/deploy/"
+
+      - name: Deploy production
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          IMAGE_TAG: sha-${{ github.event.workflow_run.head_sha }}
+        run: |
+          # shellcheck disable=SC2029
+          ssh "$SERVER_USER@$SERVER_HOST" \
+            "cd /opt/roomora/deploy &&
+             chmod +x ./*.sh &&
+             ./backup-shared-db.sh &&
+             ./deploy-environment.sh production '$IMAGE_TAG'"

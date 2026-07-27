@@ -14,6 +14,12 @@ if [[ "$ENVIRONMENT" != "production" && "$ENVIRONMENT" != "staging" ]]; then
   exit 1
 fi
 
+if [[ "$ENVIRONMENT" == "production" ]]; then
+  domain="${ROOMORA_PRODUCTION_DOMAIN:-api.roomora.com}"
+else
+  domain="${ROOMORA_STAGING_DOMAIN:-testapi.roomora.com}"
+fi
+
 current="$(tr -d '[:space:]' < "$active_file")"
 if [[ "$current" == "blue" ]]; then
   target="green"
@@ -35,9 +41,22 @@ for attempt in $(seq 1 30); do
   sleep 2
 done
 
-sed -i "s|api-${ENVIRONMENT}-${current}:5118|api-${ENVIRONMENT}-${target}:5118|" Caddyfile.roomora
+sed -i -E "s|api-${ENVIRONMENT}-(blue|green):5118|api-${ENVIRONMENT}-${target}:5118|" Caddyfile.roomora
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T gateway \
-  caddy reload --config /etc/caddy/Caddyfile
+  caddy validate --config - --adapter caddyfile < Caddyfile.roomora
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T gateway \
+  caddy reload --config - --adapter caddyfile < Caddyfile.roomora
+
+if ! docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T gateway \
+  wget -qO- --header="Host: ${domain}" http://127.0.0.1/health > /dev/null; then
+  sed -i -E "s|api-${ENVIRONMENT}-(blue|green):5118|api-${ENVIRONMENT}-${current}:5118|" Caddyfile.roomora
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T gateway \
+    caddy reload --config - --adapter caddyfile < Caddyfile.roomora
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" stop "$service"
+  echo "Rollback saglik kontrolu basarisiz; mevcut yuva korunuyor." >&2
+  exit 1
+fi
+
 printf '%s\n' "$target" > "$active_file"
 sleep 10
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" stop "api-${ENVIRONMENT}-${current}"

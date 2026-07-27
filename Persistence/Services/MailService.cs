@@ -11,8 +11,6 @@ namespace Persistence.Services
     {
         private const string DefaultSmtpServer = "smtp.gmail.com";
         private const int DefaultSmtpPort = 587;
-        private const string DefaultSenderEmail = "info.ev.arkadasim@gmail.com";
-        private const string DefaultSenderPassword = "lujs brjg mojt tuze";
 
         private readonly string _smtpServer;
         private readonly int _smtpPort;
@@ -25,21 +23,23 @@ namespace Persistence.Services
             _smtpPort = int.TryParse(ResolveSetting(configuration["SmtpSettings:Port"], DefaultSmtpPort.ToString()), out var configuredPort)
                 ? configuredPort
                 : DefaultSmtpPort;
-            _senderEmail = ResolveSetting(configuration["SmtpSettings:SenderEmail"], DefaultSenderEmail);
-            _senderPassword = ResolveSetting(configuration["SmtpSettings:Password"], DefaultSenderPassword);
+            _senderEmail = ResolveSetting(configuration["SmtpSettings:SenderEmail"], string.Empty);
+            _senderPassword = ResolveSetting(configuration["SmtpSettings:Password"], string.Empty);
         }
 
         public async Task SendEmailAsync(string to, string subject, string body)
         {
+            var senderEmail = RequireSetting(_senderEmail, "SmtpSettings:SenderEmail");
+            var senderPassword = RequireSetting(_senderPassword, "SmtpSettings:Password");
             using var client = new SmtpClient(_smtpServer, _smtpPort)
             {
-                Credentials = new NetworkCredential(_senderEmail, _senderPassword),
+                Credentials = new NetworkCredential(senderEmail, senderPassword),
                 EnableSsl = true
             };
 
             using var message = new MailMessage
             {
-                From = new MailAddress(_senderEmail),
+                From = new MailAddress(senderEmail),
                 Subject = subject,
                 Body = body,
                 IsBodyHtml = true
@@ -59,6 +59,18 @@ namespace Persistence.Services
             return value.StartsWith("CHANGE_ME_", System.StringComparison.OrdinalIgnoreCase)
                 ? fallbackValue
                 : value;
+        }
+
+        private static string RequireSetting(string? configuredValue, string settingName)
+        {
+            if (string.IsNullOrWhiteSpace(configuredValue) ||
+                configuredValue.Trim().StartsWith("CHANGE_ME_", System.StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"{settingName} yapılandırılmalıdır. Gizli değerleri kaynak kodda tutmayın; environment variable veya secret store kullanın.");
+            }
+
+            return configuredValue.Trim();
         }
     }
 }

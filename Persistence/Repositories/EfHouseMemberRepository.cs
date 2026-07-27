@@ -39,7 +39,8 @@ namespace Persistence.Repositories
                 .Include(h => h.HouseMembers.Where(hm => hm.IsActive))
                     .ThenInclude(hm => hm.User)
                 .AsNoTracking()
-                .FirstOrDefaultAsync(h => h.Id == houseId);
+                .FirstOrDefaultAsync(h => h.Id == houseId)
+                ?? throw new KeyNotFoundException("Ev grubu bulunamadı.");
         }
 
         public async Task<List<int>> GetActiveUserIdsAsync(int houseId, CancellationToken ct = default)

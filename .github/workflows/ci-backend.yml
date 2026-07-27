@@ -12,10 +12,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 8.0.x
 
@@ -24,3 +24,6 @@ jobs:
 
       - name: Build
         run: dotnet build EvArkadasim.sln --configuration Release --no-restore
+
+      - name: Build Docker image
+        run: docker build --tag roomora-backend:ci .

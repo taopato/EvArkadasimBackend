@@ -19,6 +19,15 @@ namespace Application.Features.Expenses.Commands.DeleteExpense
             var e = await _expenseRepo.GetByIdAsync(request.ExpenseId)
                     ?? throw new KeyNotFoundException("Expense not found");
 
+            var paidLines = await _ledgerRepo.GetListAsync(
+                line => line.ExpenseId == e.Id && line.IsActive && line.PaidAmount > 0m,
+                ct);
+            if (paidLines.Any())
+            {
+                throw new InvalidOperationException(
+                    "Bu harcamaya ait ödeme bulunduğu için kayıt silinemez.");
+            }
+
             // SOFT DELETE
             e.IsActive = false;
             e.UpdatedAt = DateTime.UtcNow;

@@ -20,6 +20,10 @@
 
         public DateTime? DueDate { get; set; }      // Fixed: period+DueDay; Variable: BillDate + N gün
         public DateTime? PaidDate { get; set; }
+        public int? PaidByUserId { get; set; }
+        public DateTime? UpdatedAt { get; set; }
         public string? ExternalReceiptUrl { get; set; }
+
+        public ICollection<ChargeCycleShare> Shares { get; set; } = new List<ChargeCycleShare>();
     }
 }

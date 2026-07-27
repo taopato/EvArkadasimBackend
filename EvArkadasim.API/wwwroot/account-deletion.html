@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:">
+  <title>Roomora Hesap Silme</title>
+  <style>
+    :root { color: #172839; background: #f6f3ed; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+    main { width: min(100%, 520px); }
+    .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+    .mark { width: 42px; height: 42px; border-radius: 8px; display: grid; place-items: center; background: #172839; color: #fff; font-weight: 800; font-size: 20px; }
+    .brand strong { display: block; font-size: 20px; }
+    .brand span { display: block; margin-top: 2px; color: #5f6872; font-size: 13px; }
+    section { background: #fff; border: 1px solid #e2ddd2; border-radius: 8px; padding: 28px; box-shadow: 0 14px 36px rgba(23, 40, 57, .09); }
+    h1 { margin: 0; font-size: 26px; line-height: 1.2; }
+    p { color: #5f6872; line-height: 1.6; }
+    label { display: block; margin: 24px 0 8px; font-weight: 700; font-size: 14px; }
+    input { width: 100%; height: 50px; border: 1px solid #cfc8ba; border-radius: 8px; padding: 0 14px; color: #172839; background: #fff; font-size: 16px; }
+    input:focus { outline: 2px solid #8fa9bd; outline-offset: 1px; }
+    button { width: 100%; min-height: 50px; margin-top: 14px; border: 0; border-radius: 8px; padding: 12px 16px; color: #fff; background: #93000a; font-size: 15px; font-weight: 800; cursor: pointer; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .secondary { background: #172839; }
+    .notice { margin-top: 18px; border-left: 3px solid #5f7f98; padding: 10px 0 10px 14px; color: #5f6872; font-size: 13px; line-height: 1.55; }
+    .message { min-height: 22px; margin-top: 14px; color: #2d3e50; font-weight: 650; }
+    footer { margin-top: 18px; color: #84806f; font-size: 12px; text-align: center; }
+    a { color: #2d3e50; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand"><div class="mark">R</div><div><strong>Roomora</strong><span>Ortak yaşamın kolay hali</span></div></div>
+    <section>
+      <h1 id="title">Hesabını sil</h1>
+      <p id="description">Hesabına bağlı e-posta adresini gir. Güvenli silme bağlantısını yalnızca bu adrese göndereceğiz.</p>
+      <form id="request-form">
+        <label for="email">E-posta adresi</label>
+        <input id="email" name="email" type="email" autocomplete="email" required maxlength="254">
+        <button class="secondary" type="submit">Silme bağlantısı gönder</button>
+      </form>
+      <div id="confirm-area" hidden>
+        <div class="notice">Profil ve iletişim bilgilerin kalıcı olarak silinir. Paylaşılan finansal kayıtlar, diğer ev arkadaşlarının bakiyelerini korumak için anonimleştirilmiş biçimde tutulur.</div>
+        <button id="confirm-button" type="button">Hesabımı kalıcı olarak sil</button>
+      </div>
+      <div class="message" id="message" role="status" aria-live="polite"></div>
+    </section>
+    <footer><a href="/privacy.html">Gizlilik Politikası</a> · info.ev.arkadasim@gmail.com</footer>
+  </main>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const form = document.getElementById('request-form');
+    const confirmArea = document.getElementById('confirm-area');
+    const confirmButton = document.getElementById('confirm-button');
+    const message = document.getElementById('message');
+
+    if (token) {
+      form.hidden = true;
+      confirmArea.hidden = false;
+      document.getElementById('title').textContent = 'Silme işlemini onayla';
+      document.getElementById('description').textContent = 'Bu işlem geri alınamaz. Devam ettiğinde Roomora hesabın ve kişisel bilgilerin silinir.';
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const button = form.querySelector('button');
+      button.disabled = true;
+      message.textContent = '';
+      try {
+        const response = await fetch('/api/account-deletion/request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: document.getElementById('email').value })
+        });
+        const result = await response.json();
+        message.textContent = result.message || 'İstek alındı.';
+      } catch {
+        message.textContent = 'İstek gönderilemedi. Lütfen daha sonra tekrar dene.';
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    confirmButton.addEventListener('click', async () => {
+      confirmButton.disabled = true;
+      message.textContent = '';
+      try {
+        const response = await fetch('/api/account-deletion/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        });
+        const result = await response.json();
+        message.textContent = result.message || (response.ok ? 'Hesap silindi.' : 'İşlem tamamlanamadı.');
+        if (response.ok) confirmArea.hidden = true;
+      } catch {
+        message.textContent = 'İşlem tamamlanamadı. Lütfen yeni bir silme bağlantısı iste.';
+      } finally {
+        confirmButton.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

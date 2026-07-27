@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Persistence.Contexts;
+using System.Security.Claims;
 
 namespace EvArkadasim.API.Controllers
 {
@@ -33,50 +34,84 @@ namespace EvArkadasim.API.Controllers
         }
 
         [HttpPost("Scan")]
+        [Consumes("multipart/form-data")]
         [RequestSizeLimit(20_000_000)]
         public async Task<IActionResult> Scan([FromForm] ReceiptScanRequest request, CancellationToken cancellationToken)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null) return Unauthorized();
+            if (request.HouseId <= 0 || !await IsActiveHouseMemberAsync(request.HouseId, currentUserId.Value, cancellationToken))
+                return Forbid();
             if (request.Image == null || request.Image.Length == 0)
-                return BadRequest("Fiş görseli zorunlu.");
+                return BadRequest(new { message = "Fiş görseli zorunludur." });
+            if (request.Image.Length > 12_000_000)
+                return BadRequest(new { message = "Fiş görseli en fazla 12 MB olabilir." });
+
+            var allowedTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "image/jpeg", "image/png", "image/webp"
+            };
+            if (!allowedTypes.Contains(request.Image.ContentType))
+                return BadRequest(new { message = "Fiş için JPG, PNG veya WEBP formatında bir görsel yükleyin." });
+            if (!await HasValidImageSignatureAsync(request.Image, cancellationToken))
+                return BadRequest(new { message = "Fiş görselinin dosya içeriği geçerli değil." });
 
             var turkeyToday = DateTime.UtcNow.AddHours(3).Date;
             var uploadsRoot = Path.Combine(_environment.WebRootPath ?? Path.Combine(_environment.ContentRootPath, "wwwroot"), "uploads", "receipts");
             Directory.CreateDirectory(uploadsRoot);
 
-            var extension = Path.GetExtension(request.Image.FileName);
-            var safeExtension = string.IsNullOrWhiteSpace(extension) ? ".jpg" : extension;
-            var fileName = $"{request.HouseId}_{request.UploadedByUserId}_{turkeyToday:yyyyMMdd}_{Guid.NewGuid():N}{safeExtension}";
+            var safeExtension = request.Image.ContentType.ToLowerInvariant() switch
+            {
+                "image/png" => ".png",
+                "image/webp" => ".webp",
+                _ => ".jpg"
+            };
+            var fileName = $"{request.HouseId}_{currentUserId.Value}_{turkeyToday:yyyyMMdd}_{Guid.NewGuid():N}{safeExtension}";
             var fullPath = Path.Combine(uploadsRoot, fileName);
 
-            await using (var target = System.IO.File.Create(fullPath))
+            try
             {
-                await request.Image.CopyToAsync(target, cancellationToken);
+                await using (var target = System.IO.File.Create(fullPath))
+                {
+                    await request.Image.CopyToAsync(target, cancellationToken);
+                }
+
+                ReceiptOcrResult ocrResult;
+                await using (var readStream = request.Image.OpenReadStream())
+                {
+                    ocrResult = await _ocrService.ExtractAsync(readStream, request.Image.FileName, cancellationToken);
+                }
+
+                var receipt = new Receipt
+                {
+                    HouseId = request.HouseId,
+                    UploadedByUserId = currentUserId.Value,
+                    ImageUrl = $"/uploads/receipts/{fileName}",
+                    CreatedAt = DateTime.UtcNow,
+                };
+                ApplyOcrResult(receipt, ocrResult, turkeyToday);
+
+                _dbContext.Receipts.Add(receipt);
+                await _dbContext.SaveChangesAsync(cancellationToken);
+
+                return Ok(await BuildReceiptDetailAsync(receipt.Id, cancellationToken));
             }
-
-            ReceiptOcrResult ocrResult;
-            await using (var readStream = request.Image.OpenReadStream())
+            catch
             {
-                ocrResult = await _ocrService.ExtractAsync(readStream, request.Image.FileName, cancellationToken);
+                if (System.IO.File.Exists(fullPath))
+                    System.IO.File.Delete(fullPath);
+                throw;
             }
-
-            var receipt = new Receipt
-            {
-                HouseId = request.HouseId,
-                UploadedByUserId = request.UploadedByUserId,
-                ImageUrl = $"/uploads/receipts/{fileName}",
-                CreatedAt = DateTime.UtcNow,
-            };
-            ApplyOcrResult(receipt, ocrResult, turkeyToday);
-
-            _dbContext.Receipts.Add(receipt);
-            await _dbContext.SaveChangesAsync(cancellationToken);
-
-            return Ok(await BuildReceiptDetailAsync(receipt.Id, cancellationToken));
         }
 
         [HttpGet("ByHouse/{houseId:int}")]
         public async Task<IActionResult> ByHouse(int houseId, CancellationToken cancellationToken)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null) return Unauthorized();
+            if (!await IsActiveHouseMemberAsync(houseId, currentUserId.Value, cancellationToken))
+                return Forbid();
+
             var receipts = await _dbContext.Receipts
                 .AsNoTracking()
                 .Where(x => x.HouseId == houseId)
@@ -103,19 +138,53 @@ namespace EvArkadasim.API.Controllers
         [HttpGet("{receiptId:int}")]
         public async Task<IActionResult> Get(int receiptId, CancellationToken cancellationToken)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null) return Unauthorized();
+            var houseId = await GetReceiptHouseIdAsync(receiptId, cancellationToken);
+            if (houseId is null) return NotFound();
+            if (!await IsActiveHouseMemberAsync(houseId.Value, currentUserId.Value, cancellationToken))
+                return Forbid();
+
             var receipt = await BuildReceiptDetailAsync(receiptId, cancellationToken);
             return receipt == null ? NotFound() : Ok(receipt);
+        }
+
+        [HttpDelete("{receiptId:int}")]
+        public async Task<IActionResult> Delete(int receiptId, CancellationToken cancellationToken)
+        {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null) return Unauthorized();
+
+            var receipt = await _dbContext.Receipts
+                .FirstOrDefaultAsync(x => x.Id == receiptId, cancellationToken);
+            if (receipt is null) return NotFound();
+            if (!await IsActiveHouseMemberAsync(receipt.HouseId, currentUserId.Value, cancellationToken))
+                return Forbid();
+            if (receipt.Status == ReceiptStatus.Converted || receipt.ConvertedExpenseId.HasValue)
+                return Conflict(new { message = "Harcamaya dönüştürülmüş fiş silinemez." });
+
+            _dbContext.Receipts.Remove(receipt);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            DeleteReceiptFile(receipt.ImageUrl);
+            return NoContent();
         }
 
         [HttpPost("{receiptId:int}/Reparse")]
         public async Task<IActionResult> Reparse(int receiptId, CancellationToken cancellationToken)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null) return Unauthorized();
+
             var receipt = await _dbContext.Receipts
                 .Include(x => x.Items)
                 .FirstOrDefaultAsync(x => x.Id == receiptId, cancellationToken);
 
             if (receipt == null) return NotFound();
-            if (string.IsNullOrWhiteSpace(receipt.ImageUrl)) return BadRequest("Fiş görseli bulunamadı.");
+            if (!await IsActiveHouseMemberAsync(receipt.HouseId, currentUserId.Value, cancellationToken))
+                return Forbid();
+            if (receipt.Status == ReceiptStatus.Converted)
+                return Conflict(new { message = "Harcamaya dönüştürülmüş fiş yeniden işlenemez." });
+            if (string.IsNullOrWhiteSpace(receipt.ImageUrl)) return BadRequest(new { message = "Fiş görseli bulunamadı." });
 
             var relativePath = receipt.ImageUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
             var webRoot = _environment.WebRootPath ?? Path.Combine(_environment.ContentRootPath, "wwwroot");
@@ -134,29 +203,70 @@ namespace EvArkadasim.API.Controllers
         [HttpPut("{receiptId:int}")]
         public async Task<IActionResult> Update(int receiptId, [FromBody] UpdateReceiptRequest request, CancellationToken cancellationToken)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null) return Unauthorized();
+
             var receipt = await _dbContext.Receipts
                 .Include(x => x.Items)
                 .FirstOrDefaultAsync(x => x.Id == receiptId, cancellationToken);
 
             if (receipt == null) return NotFound();
+            if (!await IsActiveHouseMemberAsync(receipt.HouseId, currentUserId.Value, cancellationToken))
+                return Forbid();
+            if (receipt.Status == ReceiptStatus.Converted)
+                return Conflict(new { message = "Harcamaya dönüştürülmüş fiş değiştirilemez." });
+            if (request.Items is null || request.Items.Count is < 1 or > 100)
+                return BadRequest(new { message = "Fişte 1 ile 100 arasında kalem bulunmalıdır." });
+            if (request.DetectedTotalAmount < 0)
+                return BadRequest(new { message = "Fiş toplamı negatif olamaz." });
 
-            receipt.StoreName = request.StoreName;
+            var activeMemberIds = await GetActiveHouseMemberIdsAsync(receipt.HouseId, cancellationToken);
+            var invalidPersonalItem = request.Items.Any(item =>
+                !item.IsShared && (!item.PersonalUserId.HasValue || !activeMemberIds.Contains(item.PersonalUserId.Value)));
+            if (invalidPersonalItem)
+                return BadRequest(new { message = "Kişisel fiş kalemleri aktif bir ev üyesine atanmalıdır." });
+
+            var normalizedItems = request.Items
+                .OrderBy(x => x.SortOrder)
+                .Select((item, index) => new
+                {
+                    Name = item.Name?.Trim(),
+                    Price = Math.Max(item.Price, 0),
+                    Quantity = item.Quantity <= 0 ? 1 : item.Quantity,
+                    LineTotal = item.LineTotal > 0
+                        ? item.LineTotal
+                        : Math.Max(item.Price, 0) * (item.Quantity <= 0 ? 1 : item.Quantity),
+                    Item = item,
+                    SortOrder = index
+                })
+                .Where(x => !string.IsNullOrWhiteSpace(x.Name) && x.LineTotal > 0)
+                .ToList();
+            if (normalizedItems.Count == 0)
+                return BadRequest(new { message = "En az bir geçerli fiş kalemi bulunmalıdır." });
+
+            receipt.StoreName = string.IsNullOrWhiteSpace(request.StoreName)
+                ? null
+                : request.StoreName.Trim()[..Math.Min(request.StoreName.Trim().Length, 256)];
             receipt.ReceiptDate = request.ReceiptDate;
-            receipt.DetectedTotalAmount = request.DetectedTotalAmount;
+            receipt.DetectedTotalAmount = request.DetectedTotalAmount > 0
+                ? request.DetectedTotalAmount
+                : normalizedItems.Sum(x => x.LineTotal);
             receipt.Status = ReceiptStatus.Reviewed;
             receipt.UpdatedAt = DateTime.UtcNow;
 
             _dbContext.ReceiptItems.RemoveRange(receipt.Items);
             receipt.Items.Clear();
 
-            foreach (var item in request.Items.OrderBy(x => x.SortOrder))
+            foreach (var normalized in normalizedItems)
             {
+                var item = normalized.Item;
+                var name = normalized.Name!;
                 receipt.Items.Add(new ReceiptItem
                 {
-                    Name = item.Name?.Trim() ?? string.Empty,
-                    Price = item.Price,
-                    Quantity = item.Quantity <= 0 ? 1 : item.Quantity,
-                    LineTotal = item.LineTotal > 0 ? item.LineTotal : item.Price * (item.Quantity <= 0 ? 1 : item.Quantity),
+                    Name = name[..Math.Min(name.Length, 256)],
+                    Price = normalized.Price,
+                    Quantity = normalized.Quantity,
+                    LineTotal = normalized.LineTotal,
                     BoxLeft = item.BoxLeft,
                     BoxTop = item.BoxTop,
                     BoxWidth = item.BoxWidth,
@@ -164,7 +274,7 @@ namespace EvArkadasim.API.Controllers
                     IsAssigned = item.IsAssigned,
                     IsShared = item.IsShared,
                     PersonalUserId = item.IsShared ? null : item.PersonalUserId,
-                    SortOrder = item.SortOrder,
+                    SortOrder = normalized.SortOrder,
                 });
             }
 
@@ -175,12 +285,27 @@ namespace EvArkadasim.API.Controllers
         [HttpPost("{receiptId:int}/ConvertToExpense")]
         public async Task<IActionResult> ConvertToExpense(int receiptId, [FromBody] ConvertReceiptToExpenseRequest request, CancellationToken cancellationToken)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null) return Unauthorized();
+
             var receipt = await _dbContext.Receipts
                 .Include(x => x.Items)
                 .FirstOrDefaultAsync(x => x.Id == receiptId, cancellationToken);
 
             if (receipt == null) return NotFound();
-            if (receipt.Items.Count == 0) return BadRequest("Fişte dönüştürülecek kalem bulunamadı.");
+            if (!await IsActiveHouseMemberAsync(receipt.HouseId, currentUserId.Value, cancellationToken))
+                return Forbid();
+            if (receipt.Status == ReceiptStatus.Converted || receipt.ConvertedExpenseId.HasValue)
+                return Conflict(new { message = "Bu fiş daha önce harcamaya dönüştürüldü." });
+            if (receipt.Items.Count == 0) return BadRequest(new { message = "Fişte dönüştürülecek kalem bulunamadı." });
+
+            var activeMemberIds = await GetActiveHouseMemberIdsAsync(receipt.HouseId, cancellationToken);
+            if (!activeMemberIds.Contains(request.PayerUserId))
+                return BadRequest(new { message = "Ödeyen kişi aktif bir ev üyesi olmalıdır." });
+            if (receipt.Items.Any(x => !x.IsShared && (!x.PersonalUserId.HasValue || !activeMemberIds.Contains(x.PersonalUserId.Value))))
+                return BadRequest(new { message = "Kişisel fiş kalemlerinin tamamı aktif ev üyelerine atanmalıdır." });
+            if (request.Category.HasValue && !Enum.IsDefined(request.Category.Value))
+                return BadRequest(new { message = "Geçersiz harcama kategorisi." });
 
             var sharedTotal = receipt.Items.Where(x => x.IsShared).Sum(x => x.LineTotal);
             var personalItems = receipt.Items
@@ -194,7 +319,10 @@ namespace EvArkadasim.API.Controllers
                 .ToList();
 
             var title = string.IsNullOrWhiteSpace(receipt.StoreName) ? "Fiş Harcaması" : $"{receipt.StoreName} Fişi";
-            var note = request.Note ?? receipt.StoreName ?? "Fişten oluşturuldu";
+            var note = string.IsNullOrWhiteSpace(request.Note)
+                ? receipt.StoreName ?? "Fişten oluşturuldu"
+                : request.Note.Trim();
+            note = note[..Math.Min(note.Length, 512)];
 
             var command = new CreateExpenseCommand
             {
@@ -202,7 +330,7 @@ namespace EvArkadasim.API.Controllers
                 Tutar = receipt.Items.Sum(x => x.LineTotal),
                 HouseId = receipt.HouseId,
                 OdeyenUserId = request.PayerUserId,
-                KaydedenUserId = request.RecordedByUserId,
+                KaydedenUserId = currentUserId.Value,
                 OrtakHarcamaTutari = sharedTotal,
                 Date = receipt.ReceiptDate ?? DateTime.UtcNow,
                 SahsiHarcamalar = personalItems,
@@ -212,12 +340,14 @@ namespace EvArkadasim.API.Controllers
                 Aciklama = note
             };
 
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
             var createdExpense = await _mediator.Send(command, cancellationToken);
 
             receipt.Status = ReceiptStatus.Converted;
             receipt.ConvertedExpenseId = createdExpense.Id;
             receipt.UpdatedAt = DateTime.UtcNow;
             await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
 
             return Ok(new
             {
@@ -268,10 +398,46 @@ namespace EvArkadasim.API.Controllers
                 .FirstOrDefaultAsync(cancellationToken);
         }
 
+        private int? GetCurrentUserId()
+        {
+            var raw = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value;
+            return int.TryParse(raw, out var userId) && userId > 0 ? userId : null;
+        }
+
+        private Task<bool> IsActiveHouseMemberAsync(int houseId, int userId, CancellationToken cancellationToken)
+        {
+            return _dbContext.HouseMembers
+                .AsNoTracking()
+                .AnyAsync(x => x.HouseId == houseId && x.UserId == userId && x.IsActive, cancellationToken);
+        }
+
+        private async Task<HashSet<int>> GetActiveHouseMemberIdsAsync(int houseId, CancellationToken cancellationToken)
+        {
+            return (await _dbContext.HouseMembers
+                    .AsNoTracking()
+                    .Where(x => x.HouseId == houseId && x.IsActive)
+                    .Select(x => x.UserId)
+                    .ToListAsync(cancellationToken))
+                .ToHashSet();
+        }
+
+        private Task<int?> GetReceiptHouseIdAsync(int receiptId, CancellationToken cancellationToken)
+        {
+            return _dbContext.Receipts
+                .AsNoTracking()
+                .Where(x => x.Id == receiptId)
+                .Select(x => (int?)x.HouseId)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
         private void ApplyOcrResult(Receipt receipt, ReceiptOcrResult ocrResult, DateTime? fallbackReceiptDate = null)
         {
             receipt.RawOcrText = ocrResult.RawText;
-            receipt.StoreName = string.IsNullOrWhiteSpace(ocrResult.StoreName) ? null : ocrResult.StoreName;
+            var storeName = ocrResult.StoreName?.Trim();
+            receipt.StoreName = string.IsNullOrWhiteSpace(storeName)
+                ? null
+                : storeName[..Math.Min(storeName.Length, 256)];
             receipt.ReceiptDate = ocrResult.ReceiptDate ?? fallbackReceiptDate ?? receipt.ReceiptDate ?? DateTime.UtcNow.AddHours(3).Date;
             receipt.DetectedTotalAmount = ocrResult.TotalAmount ?? (ocrResult.Items.Count > 0 ? ocrResult.Items.Sum(x => x.LineTotal) : receipt.DetectedTotalAmount);
             receipt.Status = ocrResult.Items.Count > 0 ? ReceiptStatus.Parsed : ReceiptStatus.Uploaded;
@@ -283,11 +449,13 @@ namespace EvArkadasim.API.Controllers
                 receipt.Items.Clear();
             }
 
-            foreach (var item in ocrResult.Items.Select((value, index) => new ReceiptItem
+            foreach (var item in ocrResult.Items
+                .Where(value => !string.IsNullOrWhiteSpace(value.Name) && value.LineTotal > 0)
+                .Select((value, index) => new ReceiptItem
             {
-                Name = value.Name,
-                Price = value.Price,
-                Quantity = value.Quantity,
+                Name = value.Name.Trim()[..Math.Min(value.Name.Trim().Length, 256)],
+                Price = Math.Max(value.Price, 0),
+                Quantity = value.Quantity <= 0 ? 1 : value.Quantity,
                 LineTotal = value.LineTotal,
                 BoxLeft = value.BoxLeft,
                 BoxTop = value.BoxTop,
@@ -301,12 +469,45 @@ namespace EvArkadasim.API.Controllers
                 receipt.Items.Add(item);
             }
         }
+
+        private static async Task<bool> HasValidImageSignatureAsync(
+            IFormFile image,
+            CancellationToken cancellationToken)
+        {
+            var header = new byte[12];
+            await using var stream = image.OpenReadStream();
+            var read = await stream.ReadAsync(header.AsMemory(0, header.Length), cancellationToken);
+
+            return image.ContentType.ToLowerInvariant() switch
+            {
+                "image/jpeg" => read >= 3 && header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF,
+                "image/png" => read >= 8 && header.AsSpan(0, 8).SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }),
+                "image/webp" => read >= 12 &&
+                    header.AsSpan(0, 4).SequenceEqual("RIFF"u8) &&
+                    header.AsSpan(8, 4).SequenceEqual("WEBP"u8),
+                _ => false
+            };
+        }
+
+        private void DeleteReceiptFile(string? imageUrl)
+        {
+            if (string.IsNullOrWhiteSpace(imageUrl) ||
+                !imageUrl.StartsWith("/uploads/receipts/", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            var webRoot = _environment.WebRootPath ?? Path.Combine(_environment.ContentRootPath, "wwwroot");
+            var receiptsRoot = Path.GetFullPath(Path.Combine(webRoot, "uploads", "receipts"));
+            var relativePath = imageUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+            var fullPath = Path.GetFullPath(Path.Combine(webRoot, relativePath));
+            var rootPrefix = receiptsRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            if (fullPath.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase) && System.IO.File.Exists(fullPath))
+                System.IO.File.Delete(fullPath);
+        }
     }
 
     public class ReceiptScanRequest
     {
         public int HouseId { get; set; }
-        public int UploadedByUserId { get; set; }
         public IFormFile? Image { get; set; }
     }
 

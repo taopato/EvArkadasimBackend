@@ -1,4 +1,3 @@
-using AutoMapper;
 using Domain.Entities;
 using MediatR;
 using Application.Features.Houses.Dtos;
@@ -10,12 +9,10 @@ namespace Application.Features.Houses.Commands.CreateHouse
         : IRequestHandler<CreateHouseCommand, CreatedHouseDto>
     {
         private readonly IHouseRepository _houseRepository;
-        private readonly IMapper _mapper;
 
-        public CreateHouseCommandHandler(IHouseRepository houseRepository, IMapper mapper)
+        public CreateHouseCommandHandler(IHouseRepository houseRepository)
         {
             _houseRepository = houseRepository;
-            _mapper = mapper;
         }
 
         public async Task<CreatedHouseDto> Handle(CreateHouseCommand request, CancellationToken cancellationToken)
@@ -35,7 +32,7 @@ namespace Application.Features.Houses.Commands.CreateHouse
             await _houseRepository.AddMemberAsync(member);
 
             // 4) DTO dön
-            return _mapper.Map<CreatedHouseDto>(added);
+            return new CreatedHouseDto { Id = added.Id, Name = added.Name };
         }
     }
 }

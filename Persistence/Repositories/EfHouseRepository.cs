@@ -84,6 +84,23 @@ namespace Persistence.Repositories
             await _context.SaveChangesAsync();
         }
 
+        public async Task DeleteAsync(int houseId)
+        {
+            var house = await _context.Houses.FindAsync(houseId);
+            if (house != null)
+            {
+                _context.Houses.Remove(house);
+                try
+                {
+                    await _context.SaveChangesAsync();
+                }
+                catch (DbUpdateException)
+                {
+                    throw new InvalidOperationException("Ev grubu silinemedi. Evde bagli harcama veya odeme kayitlari olabilir.");
+                }
+            }
+        }
+
         public async Task SaveChangesAsync()
         {
             await _context.SaveChangesAsync();

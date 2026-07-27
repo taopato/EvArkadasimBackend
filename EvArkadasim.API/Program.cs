@@ -5,7 +5,6 @@ using Application.Common.Behaviors;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
-using System.Net;
 using System.Text;
 using Persistence;
 using Core.Security.JWT;
@@ -19,6 +18,9 @@ using Persistence.Repositories;
 using System.Text.Json.Serialization;
 using EvArkadasim.API.Services.Receipts;
 using Microsoft.AspNetCore.HttpOverrides;
+using Application.Services.Accounts;
+using Persistence.Services;
+using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -48,22 +50,40 @@ builder.Services.AddScoped<ILedgerLineRepository, EfLedgerLineRepository>();
 builder.Services.AddScoped<IRecurringChargeRepository, EfRecurringChargeRepository>();
 builder.Services.AddScoped<IChargeCycleRepository, EfChargeCycleRepository>();
 builder.Services.AddScoped<IPlannedExpenseLedgerSyncService, PlannedExpenseLedgerSyncService>();
+builder.Services.AddScoped<IAccountDeletionService, AccountDeletionService>();
 
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddHttpClient<IReceiptOcrService, ReceiptOcrService>();
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient<IReceiptOcrService, ReceiptOcrService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(45);
+});
 
 // 2) MediatR — Application assembly’sini tara (V11 uyumlu kayıt)
 builder.Services.AddMediatR(typeof(Application.Features.Auths.Commands.SendVerificationCode.SendVerificationCodeCommand).Assembly);
 
-// 3) AutoMapper
-builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
-
-// 4) FluentValidation
+// 3) FluentValidation
 builder.Services.AddValidatorsFromAssembly(typeof(SendVerificationCodeCommand).Assembly);
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 
-// 5) JWT
-var tokenOptions = builder.Configuration.GetSection("TokenOptions").Get<TokenOptions>();
+// 4) JWT
+var tokenOptions = builder.Configuration.GetSection("TokenOptions").Get<TokenOptions>()
+    ?? throw new InvalidOperationException("TokenOptions configuration is missing.");
+if (IsMissingSecret(tokenOptions.SecurityKey) ||
+    IsMissingSecret(tokenOptions.Issuer) ||
+    IsMissingSecret(tokenOptions.Audience) ||
+    tokenOptions.AccessTokenExpiration <= 0)
+{
+    throw new InvalidOperationException(
+        "TokenOptions must contain a secure key, issuer, audience and a positive expiration value.");
+}
+if (!builder.Environment.IsDevelopment() &&
+    (IsMissingSecret(builder.Configuration["SmtpSettings:SenderEmail"]) ||
+     IsMissingSecret(builder.Configuration["SmtpSettings:Password"])))
+{
+    throw new InvalidOperationException(
+        "Production requires SmtpSettings:SenderEmail and SmtpSettings:Password.");
+}
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(opt =>
     {
@@ -77,9 +97,28 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(tokenOptions.SecurityKey))
         };
+        opt.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var userIdValue = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (!int.TryParse(userIdValue, out var userId) || userId <= 0)
+                {
+                    context.Fail("Invalid user identity.");
+                    return;
+                }
+
+                var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                var isActive = await db.Users
+                    .AsNoTracking()
+                    .AnyAsync(user => user.Id == userId && user.IsActive, context.HttpContext.RequestAborted);
+                if (!isActive)
+                    context.Fail("User account is inactive.");
+            }
+        };
     });
 
-// 6) MVC + JSON + Swagger + CORS
+// 5) MVC + JSON + Swagger + CORS
 builder.Services.AddControllers()
     .AddJsonOptions(o =>
     {
@@ -91,7 +130,7 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "EvArkadasim API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Roomora API", Version = "v1" });
 
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
@@ -165,19 +204,19 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.KnownProxies.Clear();
 });
 
-// 7) Kestrel: HTTP 5118 + HTTPS 7118
+// 7) Kestrel: TLS is terminated by the production reverse proxy.
 builder.WebHost.ConfigureKestrel(options =>
 {
-    if (builder.Environment.IsDevelopment())
-    {
-        options.ListenAnyIP(5118); // Local/mobile development
-    }
-    else
-    {
-        options.Listen(IPAddress.Loopback, 5118); // Production: only local reverse proxy can reach API
-    }
+    // The API is not published directly in production, but it must listen on
+    // every container interface so the reverse proxy can reach it.
+    options.ListenAnyIP(5118);
 
-    if (builder.Environment.IsDevelopment())
+    var runningInContainer = string.Equals(
+        Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"),
+        "true",
+        StringComparison.OrdinalIgnoreCase);
+
+    if (builder.Environment.IsDevelopment() && !runningInContainer)
     {
         options.ListenAnyIP(7118, listen => listen.UseHttps()); // Local development HTTPS
     }
@@ -185,12 +224,25 @@ builder.WebHost.ConfigureKestrel(options =>
 
 var app = builder.Build();
 
-// 8) Otomatik migration
-using (var scope = app.Services.CreateScope())
+// 8) Schema changes are explicit in production so blue-green instances can
+// start without racing each other. Run the image with --migrate-only first.
+var migrateOnly = args.Contains("--migrate-only", StringComparer.OrdinalIgnoreCase);
+var shouldMigrate = app.Environment.IsDevelopment() ||
+    migrateOnly ||
+    builder.Configuration.GetValue<bool>("Database:RunMigrations");
+
+if (shouldMigrate)
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
+    EnsureProfileColumns(db);
     EnsureReceiptTables(db);
+}
+
+if (migrateOnly)
+{
+    return;
 }
 
 // 9) Pipeline
@@ -265,9 +317,50 @@ app.UseCors(RemoteTestCorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapGet("/health", async (AppDbContext db, CancellationToken cancellationToken) =>
+{
+    var databaseAvailable = await db.Database.CanConnectAsync(cancellationToken);
+    return databaseAvailable
+        ? Results.Ok(new
+        {
+            status = "healthy",
+            service = "roomora-api",
+            database = "available",
+            timestamp = DateTimeOffset.UtcNow
+        })
+        : Results.Json(
+            new
+            {
+                status = "unhealthy",
+                service = "roomora-api",
+                database = "unavailable",
+                timestamp = DateTimeOffset.UtcNow
+            },
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+}).AllowAnonymous();
+
 app.MapControllers();
 
 app.Run();
+
+static bool IsMissingSecret(string? value)
+{
+    return string.IsNullOrWhiteSpace(value) ||
+        value.Trim().StartsWith("CHANGE_ME_", StringComparison.OrdinalIgnoreCase);
+}
+
+static void EnsureProfileColumns(AppDbContext db)
+{
+    const string sql = """
+IF COL_LENGTH('Users', 'PhoneNumber') IS NULL
+    ALTER TABLE [Users] ADD [PhoneNumber] NVARCHAR(16) NULL;
+IF COL_LENGTH('Users', 'Iban') IS NULL
+    ALTER TABLE [Users] ADD [Iban] NVARCHAR(26) NULL;
+IF COL_LENGTH('Users', 'ProfileImageUrl') IS NULL
+    ALTER TABLE [Users] ADD [ProfileImageUrl] NVARCHAR(1024) NULL;
+""";
+    db.Database.ExecuteSqlRaw(sql);
+}
 
 static void EnsureReceiptTables(AppDbContext db)
 {

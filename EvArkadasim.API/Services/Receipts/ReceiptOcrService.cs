@@ -32,7 +32,8 @@ namespace EvArkadasim.API.Services.Receipts
             var pythonServiceUrl = _configuration["ReceiptOcr:PythonServiceUrl"];
             if (!string.IsNullOrWhiteSpace(pythonServiceUrl))
             {
-                var pythonResult = await TryExtractWithPythonServiceAsync(pythonServiceUrl, imageBytes, fileName, cancellationToken);
+                var pythonResult = EnrichWithRawText(
+                    await TryExtractWithPythonServiceAsync(pythonServiceUrl, imageBytes, fileName, cancellationToken));
                 if (HasUsefulData(pythonResult))
                 {
                     return pythonResult;
@@ -49,7 +50,7 @@ namespace EvArkadasim.API.Services.Receipts
             {
                 using var content = new MultipartFormDataContent();
                 using var streamContent = new StreamContent(new MemoryStream(imageBytes));
-                streamContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+                streamContent.Headers.ContentType = new MediaTypeHeaderValue(GetImageContentType(fileName));
                 content.Add(streamContent, "file", fileName);
                 content.Add(new StringContent(apiKey), "apikey");
                 content.Add(new StringContent("tur"), "language");
@@ -78,7 +79,7 @@ namespace EvArkadasim.API.Services.Receipts
             {
                 using var content = new MultipartFormDataContent();
                 using var streamContent = new StreamContent(new MemoryStream(imageBytes));
-                streamContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+                streamContent.Headers.ContentType = new MediaTypeHeaderValue(GetImageContentType(fileName));
                 content.Add(streamContent, "file", fileName);
 
                 using var response = await _httpClient.PostAsync($"{baseUrl.TrimEnd('/')}/scan", content, cancellationToken);
@@ -104,7 +105,9 @@ namespace EvArkadasim.API.Services.Receipts
                         Name = item.Name ?? string.Empty,
                         Price = item.Price,
                         Quantity = item.Quantity <= 0 ? 1 : item.Quantity,
-                        LineTotal = item.LineTotal > 0 ? item.LineTotal : item.Price,
+                        LineTotal = item.LineTotal > 0
+                            ? item.LineTotal
+                            : item.Price * (item.Quantity <= 0 ? 1 : item.Quantity),
                         BoxLeft = item.BoxLeft,
                         BoxTop = item.BoxTop,
                         BoxWidth = item.BoxWidth,
@@ -121,6 +124,35 @@ namespace EvArkadasim.API.Services.Receipts
         private static bool HasUsefulData(ReceiptOcrResult result)
         {
             return result.Items.Count > 0 || result.TotalAmount.HasValue || !string.IsNullOrWhiteSpace(result.RawText);
+        }
+
+        private static string GetImageContentType(string fileName)
+        {
+            return Path.GetExtension(fileName).ToLowerInvariant() switch
+            {
+                ".png" => "image/png",
+                ".webp" => "image/webp",
+                _ => "image/jpeg"
+            };
+        }
+
+        private static ReceiptOcrResult EnrichWithRawText(ReceiptOcrResult result)
+        {
+            if (string.IsNullOrWhiteSpace(result.RawText))
+            {
+                EnsureFallbackTotalItem(result);
+                return result;
+            }
+
+            var parsed = ParseReceiptText(result.RawText);
+            result.StoreName = string.IsNullOrWhiteSpace(result.StoreName) ? parsed.StoreName : result.StoreName;
+            result.ReceiptDate ??= parsed.ReceiptDate;
+            result.TotalAmount ??= parsed.TotalAmount;
+            if (result.Items.Count == 0)
+                result.Items = parsed.Items;
+
+            EnsureFallbackTotalItem(result);
+            return result;
         }
 
         private static string ExtractParsedText(string json)
@@ -151,18 +183,20 @@ namespace EvArkadasim.API.Services.Receipts
             if (doc.RootElement.TryGetProperty("ParsedResults", out var parsedResults) && parsedResults.ValueKind == JsonValueKind.Array)
             {
                 var lines = ExtractOverlayLines(parsedResults);
+                if (lines.Count == 0)
+                    return ParseReceiptText(rawText);
+
                 result.StoreName = lines.Select(x => x.Text).FirstOrDefault();
                 result.ReceiptDate = TryExtractDate(lines.Select(x => x.Text));
                 result.TotalAmount = TryExtractTotal(lines.Select(x => x.Text));
                 result.Items = ExtractItems(lines);
-                EnsureFallbackTotalItem(result);
-                return result;
+                return EnrichWithRawText(result);
             }
 
             return ParseReceiptText(rawText);
         }
 
-        private static ReceiptOcrResult ParseReceiptText(string rawText)
+        private static ReceiptOcrResult ParseReceiptText(string? rawText)
         {
             var result = new ReceiptOcrResult { RawText = rawText ?? string.Empty };
             if (string.IsNullOrWhiteSpace(rawText)) return result;
@@ -350,8 +384,12 @@ namespace EvArkadasim.API.Services.Receipts
                 var lower = line.ToLowerInvariant();
                 if (!lower.Contains("genel toplam") && !lower.Contains("toplam")) continue;
 
-                var match = Regex.Match(line, @"(?<amount>\d{1,3}(?:[ .]\d{3})*(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?)");
-                if (match.Success && TryParseAmount(match.Groups["amount"].Value, out var amount))
+                var totalIndex = lower.LastIndexOf("toplam", StringComparison.Ordinal);
+                var amountSection = totalIndex >= 0
+                    ? line[(totalIndex + "toplam".Length)..]
+                    : line;
+                var match = Regex.Match(amountSection, @"(?<amount>\d{1,3}(?:[ .]\d{3})*(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?)");
+                if (match.Success && TryParseAmount(match.Groups["amount"].Value, out var amount) && amount > 0)
                 {
                     return amount;
                 }
@@ -427,10 +465,7 @@ namespace EvArkadasim.API.Services.Receipts
 
         private static string NormalizeLine(string line)
         {
-            return line
-                .Replace("\t", " ")
-                .Replace("  ", " ")
-                .Trim();
+            return Regex.Replace(line.Replace("\t", " "), @"\s+", " ").Trim();
         }
 
         private sealed class ReceiptOverlayLine

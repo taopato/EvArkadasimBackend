@@ -1,0 +1,17 @@
+{$ROOMORA_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy api-blue:5118
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

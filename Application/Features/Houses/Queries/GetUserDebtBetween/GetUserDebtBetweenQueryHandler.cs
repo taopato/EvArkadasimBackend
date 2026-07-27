@@ -13,15 +13,18 @@ namespace Application.Features.Houses.Queries.GetUserDebtBetween
         private readonly ILedgerLineRepository _ledgerRepo;
         private readonly IPlannedExpenseLedgerSyncService _plannedExpenseLedgerSyncService;
         private readonly IUserRepository _userRepo;
+        private readonly IExpenseRepository _expenseRepo;
 
         public GetUserDebtBetweenQueryHandler(
             ILedgerLineRepository ledgerRepo,
             IPlannedExpenseLedgerSyncService plannedExpenseLedgerSyncService,
-            IUserRepository userRepo)
+            IUserRepository userRepo,
+            IExpenseRepository expenseRepo)
         {
             _ledgerRepo = ledgerRepo;
             _plannedExpenseLedgerSyncService = plannedExpenseLedgerSyncService;
             _userRepo = userRepo;
+            _expenseRepo = expenseRepo;
         }
 
         public async Task<PairDebtDetailDto> Handle(GetUserDebtBetweenQuery request, CancellationToken ct)
@@ -50,6 +53,23 @@ namespace Application.Features.Houses.Queries.GetUserDebtBetween
             var userAName = $"{userA?.FirstName} {userA?.LastName}".Trim();
             var userBName = $"{userB?.FirstName} {userB?.LastName}".Trim();
             var netForUserA = bToA - aToB;
+            var recentExpenses = new System.Collections.Generic.List<PairExpenseItemDto>();
+            foreach (var expenseId in lines
+                .OrderByDescending(line => line.PostDate)
+                .Select(line => line.ExpenseId)
+                .Distinct()
+                .Take(6))
+            {
+                var expense = await _expenseRepo.GetByIdAsync(expenseId);
+                if (expense is null) continue;
+                recentExpenses.Add(new PairExpenseItemDto
+                {
+                    ExpenseId = expense.Id,
+                    Title = expense.Tur,
+                    Amount = expense.Tutar,
+                    Date = expense.PostDate
+                });
+            }
 
             if (aToB > bToA)
             {
@@ -68,7 +88,8 @@ namespace Application.Features.Houses.Queries.GetUserDebtBetween
                     Tutar = amount,
                     NetAmount = amount,
                     Net = netForUserA,
-                    NetForUserId = request.UserAId
+                    NetForUserId = request.UserAId,
+                    RecentExpenses = recentExpenses
                 };
             }
 
@@ -89,7 +110,8 @@ namespace Application.Features.Houses.Queries.GetUserDebtBetween
                     Tutar = amount,
                     NetAmount = amount,
                     Net = netForUserA,
-                    NetForUserId = request.UserAId
+                    NetForUserId = request.UserAId,
+                    RecentExpenses = recentExpenses
                 };
             }
 
@@ -103,7 +125,8 @@ namespace Application.Features.Houses.Queries.GetUserDebtBetween
                 Tutar = 0m,
                 NetAmount = 0m,
                 Net = 0m,
-                NetForUserId = request.UserAId
+                NetForUserId = request.UserAId,
+                RecentExpenses = recentExpenses
             };
         }
     }

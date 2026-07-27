@@ -1,0 +1,15 @@
+:80 {
+	@production host api.roomora.com
+	handle @production {
+		reverse_proxy api-production-blue:5118
+	}
+
+	@staging host testapi.roomora.com
+	handle @staging {
+		reverse_proxy api-staging-blue:5118
+	}
+
+	handle {
+		respond "Roomora gateway" 200
+	}
+}

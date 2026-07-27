@@ -23,7 +23,6 @@ namespace Application.Features.Expenses.Commands.CreateExpense
 
         public CreateExpenseCommandHandler(
             IExpenseRepository expenseRepository,
-            AutoMapper.IMapper mapper,
             IHouseMemberRepository houseMemberRepo,
             ILedgerLineRepository ledgerRepo,
             IShareRepository shareRepository)
@@ -72,13 +71,28 @@ namespace Application.Features.Expenses.Commands.CreateExpense
                 });
             }
 
-            var participants = (await _houseMemberRepo.GetActiveUserIdsAsync(request.HouseId, ct))
+            var activeMembers = (await _houseMemberRepo.GetActiveUserIdsAsync(request.HouseId, ct))
                 .Distinct()
                 .OrderBy(id => id)
                 .ToList();
 
-            if (participants.Count == 0)
+            if (activeMembers.Count == 0)
                 throw new InvalidOperationException("Aktif ev üyesi bulunamadı.");
+
+            var requestedParticipants = (request.Participants ?? new List<int>())
+                .Where(id => id > 0)
+                .Distinct()
+                .OrderBy(id => id)
+                .ToList();
+            if (requestedParticipants.Any(id => !activeMembers.Contains(id)))
+                throw new InvalidOperationException("Seçilen katılımcılardan biri bu evin aktif üyesi değil.");
+
+            var participants = requestedParticipants.Count > 0
+                ? requestedParticipants
+                : activeMembers;
+
+            if (personalItems.Any(item => !participants.Contains(item.UserId)))
+                throw new InvalidOperationException("Kişisel kalem yalnızca seçilen katılımcılara eklenebilir.");
 
             var created = await _expenseRepository.AddAsync(entity);
             await _expenseRepository.SaveChangesAsync();
@@ -87,9 +101,7 @@ namespace Application.Features.Expenses.Commands.CreateExpense
                 .Select(share => new Share
                 {
                     ExpenseId = created.Id,
-                    HarcamaId = created.Id,
                     UserId = share.UserId,
-                    PaylasimUserId = share.UserId,
                     PaylasimTutar = share.Amount,
                     PaylasimTuru = PaylasimTuru.Esit,
                     Date = whenUtc
@@ -220,7 +232,7 @@ namespace Application.Features.Expenses.Commands.CreateExpense
                 KaydedenUserId = creatorUserId,
                 CreatedDate = whenUtc,
                 IsActive = true,
-                Description = description,
+                Description = description ?? string.Empty,
                 Note = request.Note ?? request.Aciklama ?? request.Description,
                 PostDate = whenUtc,
                 DueDate = whenUtc,
@@ -370,9 +382,7 @@ namespace Application.Features.Expenses.Commands.CreateExpense
                     .Select(share => new Share
                     {
                         ExpenseId = child.Id,
-                        HarcamaId = child.Id,
                         UserId = share.UserId,
-                        PaylasimUserId = share.UserId,
                         PaylasimTutar = share.Amount,
                         PaylasimTuru = PaylasimTuru.Esit,
                         Date = child.DueDate ?? child.CreatedDate
@@ -445,9 +455,7 @@ namespace Application.Features.Expenses.Commands.CreateExpense
                     .Select(share => new Share
                     {
                         ExpenseId = child.Id,
-                        HarcamaId = child.Id,
                         UserId = share.UserId,
-                        PaylasimUserId = share.UserId,
                         PaylasimTutar = share.Amount,
                         PaylasimTuru = PaylasimTuru.Esit,
                         Date = child.DueDate ?? child.CreatedDate

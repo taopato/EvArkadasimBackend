@@ -21,7 +21,16 @@ namespace Persistence.Security.JWT
         {
             _tokenOptions = configuration
                 .GetSection("TokenOptions")
-                .Get<TokenOptions>();              // Binder paketi yüklü olmalı
+                .Get<TokenOptions>()
+                ?? throw new InvalidOperationException("TokenOptions configuration is missing.");
+
+            if (string.IsNullOrWhiteSpace(_tokenOptions.SecurityKey) ||
+                string.IsNullOrWhiteSpace(_tokenOptions.Issuer) ||
+                string.IsNullOrWhiteSpace(_tokenOptions.Audience) ||
+                _tokenOptions.AccessTokenExpiration <= 0)
+            {
+                throw new InvalidOperationException("TokenOptions configuration is invalid.");
+            }
         }
 
         public AccessToken CreateToken(User user)
@@ -32,8 +41,8 @@ namespace Persistence.Security.JWT
             var jwt = new JwtSecurityToken(
                 issuer: _tokenOptions.Issuer,
                 audience: _tokenOptions.Audience,
-                expires: DateTime.Now.AddMinutes(_tokenOptions.AccessTokenExpiration),
-                notBefore: DateTime.Now,
+                expires: DateTime.UtcNow.AddMinutes(_tokenOptions.AccessTokenExpiration),
+                notBefore: DateTime.UtcNow,
                 claims: new[]
                 {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),

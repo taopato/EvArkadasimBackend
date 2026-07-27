@@ -1,6 +1,6 @@
-# Ev Arkadasim Backend
+# Roomora Backend
 
-Ev Arkadasim'in backend servisi; kimlik dogrulama, ev ve uye yonetimi, harcama akislari, duzenli gider planlari, odemeler ve borc-alacak hesaplarini tek bir API altinda toplar.
+Roomora'nin backend servisi; kimlik dogrulama, ev ve uye yonetimi, harcama akislari, duzenli gider planlari, odemeler ve borc-alacak hesaplarini tek bir API altinda toplar.
 
 Yapi, is kurallarini ve veri erisimini ayri katmanlarda tutan bir Clean Architecture duzeni uzerine kuruludur. Ama amac yalnizca teknik olarak duzgun olmak degil; urun tarafinda hizli ilerlerken bakimi da kolay tutmaktir.
 
@@ -16,7 +16,7 @@ Yapi, is kurallarini ve veri erisimini ayri katmanlarda tutan bir Clean Architec
 
 ## Teknoloji
 
-- .NET 7
+- .NET 8
 - ASP.NET Core Web API
 - Entity Framework Core
 - SQL Server
@@ -30,6 +30,30 @@ dotnet restore
 dotnet build
 dotnet run --project EvArkadasim.API
 ```
+
+Gercek cihaz testi icin API gelistirme ortaminda `0.0.0.0:5118` uzerinden dinler. Yerel baglanti, JWT, SMTP ve OCR degerlerini Git'e eklenmeyen `EvArkadasim.API/appsettings.Local.json` dosyasinda tanimlayin.
+
+Tekrar calistirilabilir temel API kontrolu:
+
+```powershell
+.\scripts\smoke-test.ps1 -Email <test-email> -Password <test-password> -UserId <id> -HouseId <id>
+```
+
+Tum bagimliliklari Docker ile calistirmak:
+
+```powershell
+docker compose -f compose.local.yml up --build
+```
+
+Blue-green production yayini, rollback ve yedekleme akisi icin
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) belgesine bakin.
+
+## Uretim
+
+- Tum `CHANGE_ME` degerlerini ortam degiskenleriyle saglayin.
+- API'yi TLS sonlandiran bir reverse proxy arkasinda yayinlayin.
+- `privacy.html` ve `account-deletion.html` adreslerinin herkese acik oldugunu dogrulayin.
+- SMTP parolasini ve OCR anahtarini yalnizca sunucu secret yonetiminde saklayin.
 
 ## Katmanlar
 

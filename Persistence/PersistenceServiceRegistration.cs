@@ -1,5 +1,4 @@
-﻿using Application.Features.Expenses.Profiles;
-using Application.Services.Repositories;  // IUserRepository
+﻿using Application.Services.Repositories;
 using Core.Interfaces;
 using Core.Security.JWT;                  // ITokenHelper
 using Microsoft.EntityFrameworkCore;
@@ -25,17 +24,10 @@ namespace Persistence
             services.AddScoped<IUserRepository, EfUserRepository>();
             services.AddScoped<IMailService, MailService>();
             services.AddScoped<IVerificationCodeRepository, EfVerificationCodeRepository>();
-            services.AddDbContext<AppDbContext>(options =>
-                options.UseSqlServer(
-                    configuration.GetConnectionString("DefaultConnection")
-                )
-            );
             services.AddScoped<IExpenseRepository, EfExpenseRepository>();
             services.AddScoped<IHouseRepository, EfHouseRepository>();
             services.AddScoped<IPaymentRepository, EfPaymentRepository>();
-            services.AddScoped<IHouseRepository, EfHouseRepository>();
             services.AddScoped<IShareRepository, EfShareRepository>();
-            services.AddAutoMapper(typeof(ExpenseMappingProfile).Assembly);
             services.AddScoped<IPaymentAllocationRepository, EfPaymentAllocationRepository>();
             services.AddScoped<IPaymentReadRepository, EfPaymentReadRepository>();
             services.AddScoped<IExpenseReadRepository, EfExpenseReadRepository>();

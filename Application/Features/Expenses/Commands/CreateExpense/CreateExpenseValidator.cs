@@ -76,7 +76,16 @@ namespace Application.Features.Expenses.Commands.CreateExpense
                     return;
                 }
 
-                var memberIds = house.HouseMembers.Select(m => m.UserId).ToHashSet();
+                var memberIds = house.HouseMembers
+                    .Where(m => m.IsActive)
+                    .Select(m => m.UserId)
+                    .ToHashSet();
+
+                if (!memberIds.Contains(cmd.KaydedenUserId))
+                    ctx.AddFailure("KaydedenUserId", "Harcamayı kaydeden kişi aktif bir ev üyesi olmalı.");
+
+                if (!memberIds.Contains(cmd.OdeyenUserId))
+                    ctx.AddFailure("OdeyenUserId", "Ödeyen kişi aktif bir ev üyesi olmalı.");
 
                 foreach (var pe in cmd.SahsiHarcamalar)
                 {

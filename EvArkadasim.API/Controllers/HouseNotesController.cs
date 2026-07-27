@@ -26,7 +26,7 @@ public class HouseNotesController : ControllerBase
         var userId = GetCurrentUserId();
         if (userId <= 0)
         {
-            return Unauthorized(new { message = "Gecerli kullanici bulunamadi." });
+            return Unauthorized(new { message = "Geçerli kullanıcı bulunamadı." });
         }
 
         if (!await _houseRepository.IsActiveMemberAsync(houseId, userId))
@@ -64,7 +64,7 @@ public class HouseNotesController : ControllerBase
         var userId = GetCurrentUserId();
         if (userId <= 0)
         {
-            return Unauthorized(new { message = "Gecerli kullanici bulunamadi." });
+            return Unauthorized(new { message = "Geçerli kullanıcı bulunamadı." });
         }
 
         if (!await _houseRepository.IsActiveMemberAsync(houseId, userId))
@@ -75,7 +75,7 @@ public class HouseNotesController : ControllerBase
         var title = (request.Title ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(title))
         {
-            return BadRequest(new { message = "Baslik bos olamaz." });
+            return BadRequest(new { message = "Başlık boş olamaz." });
         }
 
         var section = await _houseNoteRepository.AddSectionAsync(new HouseNoteSection
@@ -102,13 +102,13 @@ public class HouseNotesController : ControllerBase
         var userId = GetCurrentUserId();
         if (userId <= 0)
         {
-            return Unauthorized(new { message = "Gecerli kullanici bulunamadi." });
+            return Unauthorized(new { message = "Geçerli kullanıcı bulunamadı." });
         }
 
         var section = await _houseNoteRepository.GetSectionByIdAsync(sectionId);
         if (section == null)
         {
-            return NotFound(new { message = "Not basligi bulunamadi." });
+            return NotFound(new { message = "Not başlığı bulunamadı." });
         }
 
         if (!await _houseRepository.IsActiveMemberAsync(section.HouseId, userId))
@@ -119,7 +119,7 @@ public class HouseNotesController : ControllerBase
         var content = (request.Content ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(content))
         {
-            return BadRequest(new { message = "Liste maddesi bos olamaz." });
+            return BadRequest(new { message = "Liste maddesi boş olamaz." });
         }
 
         var item = await _houseNoteRepository.AddItemAsync(new HouseNoteItem
@@ -139,13 +139,13 @@ public class HouseNotesController : ControllerBase
         var userId = GetCurrentUserId();
         if (userId <= 0)
         {
-            return Unauthorized(new { message = "Gecerli kullanici bulunamadi." });
+            return Unauthorized(new { message = "Geçerli kullanıcı bulunamadı." });
         }
 
         var item = await _houseNoteRepository.GetItemByIdAsync(itemId);
         if (item == null || item.DeletedAt != null)
         {
-            return NotFound(new { message = "Liste maddesi bulunamadi." });
+            return NotFound(new { message = "Liste maddesi bulunamadı." });
         }
 
         if (!await _houseRepository.IsActiveMemberAsync(item.Section.HouseId, userId))
@@ -167,13 +167,13 @@ public class HouseNotesController : ControllerBase
         var userId = GetCurrentUserId();
         if (userId <= 0)
         {
-            return Unauthorized(new { message = "Gecerli kullanici bulunamadi." });
+            return Unauthorized(new { message = "Geçerli kullanıcı bulunamadı." });
         }
 
         var item = await _houseNoteRepository.GetItemByIdAsync(itemId);
         if (item == null || item.DeletedAt != null)
         {
-            return NotFound(new { message = "Liste maddesi bulunamadi." });
+            return NotFound(new { message = "Liste maddesi bulunamadı." });
         }
 
         if (!await _houseRepository.IsActiveMemberAsync(item.Section.HouseId, userId))
@@ -194,13 +194,13 @@ public class HouseNotesController : ControllerBase
         var userId = GetCurrentUserId();
         if (userId <= 0)
         {
-            return Unauthorized(new { message = "Gecerli kullanici bulunamadi." });
+            return Unauthorized(new { message = "Geçerli kullanıcı bulunamadı." });
         }
 
         var section = await _houseNoteRepository.GetSectionByIdAsync(sectionId);
         if (section == null || section.DeletedAt != null)
         {
-            return NotFound(new { message = "Not basligi bulunamadi." });
+            return NotFound(new { message = "Not başlığı bulunamadı." });
         }
 
         if (!await _houseRepository.IsActiveMemberAsync(section.HouseId, userId))

@@ -1,4 +1,5 @@
 ﻿// EvArkadasim.API/Controllers/AuthController.cs
+using Application.Features.Auths.Commands.AppleLogin;
 using Application.Features.Auths.Commands.GoogleLogin;
 using Application.Features.Auths.Commands.Login;
 using Application.Features.Auths.Commands.ResetPassword;
@@ -9,6 +10,10 @@ using Google.Apis.Auth;
 using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Net.Http;
+using System.Text.Json;
 
 namespace EvArkadasim.API.Controllers
 {
@@ -18,6 +23,7 @@ namespace EvArkadasim.API.Controllers
     {
         private readonly IMediator _mediator;
         private readonly IConfiguration _configuration;
+        private static readonly HttpClient _httpClient = new HttpClient();
 
         public AuthController(IMediator mediator, IConfiguration configuration)
         {
@@ -146,6 +152,59 @@ namespace EvArkadasim.API.Controllers
             {
                 Email = payload.Email,
                 FullName = fullName ?? payload.Email
+            });
+
+            return Ok(result);
+        }
+
+        [HttpPost("AppleLogin")]
+        public async Task<IActionResult> AppleLogin([FromBody] AppleLoginRequestDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.IdentityToken))
+                return BadRequest("IdentityToken zorunlu.");
+
+            var bundleId = _configuration["AppleAuth:BundleId"];
+            if (string.IsNullOrWhiteSpace(bundleId))
+                return StatusCode(500, "Apple BundleId tanımlı değil.");
+
+            JwtSecurityToken jwtToken;
+            try
+            {
+                var handler = new JwtSecurityTokenHandler();
+                jwtToken = handler.ReadJwtToken(dto.IdentityToken);
+
+                var keysJson = await _httpClient.GetStringAsync("https://appleid.apple.com/auth/keys");
+                var jwks = new JsonWebKeySet(keysJson);
+                var signingKey = jwks.Keys.FirstOrDefault(k => k.Kid == jwtToken.Header.Kid);
+                if (signingKey == null)
+                    return Unauthorized("Apple imza anahtarı bulunamadı.");
+
+                var validationParameters = new TokenValidationParameters
+                {
+                    ValidIssuer = "https://appleid.apple.com",
+                    ValidAudience = bundleId,
+                    IssuerSigningKey = signingKey,
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                };
+
+                handler.ValidateToken(dto.IdentityToken, validationParameters, out _);
+            }
+            catch
+            {
+                return Unauthorized("Geçersiz Apple token.");
+            }
+
+            var email = jwtToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value;
+            if (string.IsNullOrWhiteSpace(email))
+                return Unauthorized("Apple e-posta bilgisi alınamadı.");
+
+            var result = await _mediator.Send(new AppleLoginCommand
+            {
+                Email = email,
+                FullName = dto.FullName ?? email
             });
 
             return Ok(result);

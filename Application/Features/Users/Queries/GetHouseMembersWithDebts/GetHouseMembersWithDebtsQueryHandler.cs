@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Application.Features.Houses.Dtos;
 using Application.Services.PlannedExpenses;
 using Application.Services.Repositories;
-using AutoMapper;
 using MediatR;
 
 namespace Application.Features.Houses.Queries.GetHouseMembersWithDebts
@@ -16,19 +15,16 @@ namespace Application.Features.Houses.Queries.GetHouseMembersWithDebts
     {
         private readonly IHouseRepository _houseRepo;
         private readonly ILedgerLineRepository _ledgerRepo;
-        private readonly IMapper _mapper;
         private readonly IPlannedExpenseLedgerSyncService _plannedExpenseLedgerSyncService;
 
         public GetHouseMembersWithDebtsQueryHandler(
             IHouseRepository houseRepo,
             ILedgerLineRepository ledgerRepo,
-            IPlannedExpenseLedgerSyncService plannedExpenseLedgerSyncService,
-            IMapper mapper)
+            IPlannedExpenseLedgerSyncService plannedExpenseLedgerSyncService)
         {
             _houseRepo = houseRepo;
             _ledgerRepo = ledgerRepo;
             _plannedExpenseLedgerSyncService = plannedExpenseLedgerSyncService;
-            _mapper = mapper;
         }
 
         public async Task<List<MemberDebtDto>> Handle(
@@ -61,6 +57,7 @@ namespace Application.Features.Houses.Queries.GetHouseMembersWithDebts
                     UserId = uid,
                     FullName = $"{member.User.FirstName} {member.User.LastName}",
                     Email = member.User.Email,
+                    ProfileImageUrl = member.User.ProfileImageUrl,
                     Alacak = alacak,
                     Borc = borc
                 });

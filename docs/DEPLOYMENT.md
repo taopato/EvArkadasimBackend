@@ -5,11 +5,11 @@
 1. Degisiklik local Docker ortaminda test edilir.
 2. Kod bir feature branch'e pushlanir ve pull request acilir.
 3. CI, .NET build ve Docker image build kontrollerini yapar.
-4. `main` branch'e birlestirildiginde GHCR'a commit SHA etiketiyle image yazilir.
-5. Production deploy workflow'u manuel onayla baslatilir.
-6. Sunucu migration'i kontrollu calistirir ve bos blue/green yuvasini acilir.
+4. `development` push'u staging, `main` push'u production image'ini GHCR'a yazar.
+5. Image yayini basarili olunca ilgili sunucu ortami otomatik dagitilir.
+6. Sunucu migration'i kontrollu calistirir ve bos blue/green yuvasini acar.
 7. Health check basariliysa Caddy trafigi yeni yuvaya kesintisiz aktarir.
-8. Sorunda `rollback.sh` onceki container'a geri doner.
+8. Sorunda `rollback-environment.sh` onceki container'a geri doner.
 
 ## Roomora Sunucusu Branch Akisi
 
@@ -39,6 +39,16 @@ cd /opt/roomora/deploy
 GitHub Actions icin ayri `roomora-deploy` SSH kullanicisi kullanilir. Kisisel
 SSH anahtari CI sistemine kopyalanmaz.
 
+Kurulu alan adlari ve veritabanlari:
+
+| Branch | Ortam | API | Veritabani |
+| --- | --- | --- | --- |
+| `development` | staging | `https://testapi.roomora.com` | `RoomoraStagingDb` |
+| `main` | production | `https://api.roomora.com` | `RoomoraDb` |
+
+Her iki alan adinin A kaydi `65.109.139.24` adresine yonelmelidir. DNS
+yayildiktan sonra sunucudaki Caddy HTTPS sertifikasini otomatik alir.
+
 ## Local Docker
 
 Docker Desktop calisirken backend repo kokunde:
@@ -65,19 +75,17 @@ Verileri de tamamen silmek ancak bilerek sifirlamak istendiginde:
 docker compose -f compose.local.yml down --volumes
 ```
 
-## Production Ilk Kurulum
+## Sunucu Konumu
 
-Sunucuda `/opt/roomora/deploy` dizinine `deploy` klasorunun icerigi kopyalanir.
-`.env.production.example`, `.env.production` adi ile kopyalanir ve gercek
-secret degerleri girilir. Bu dosya Git'e eklenmez.
+- Compose ve betikler: `/opt/roomora/deploy`
+- Gizli ayarlar: `/opt/roomora/deploy/.env.server`
+- SQL yedekleri: `/opt/roomora/backups`
+- Production yuklemeleri: `roomora_production_uploads` Docker volume
+- Staging yuklemeleri: `roomora_staging_uploads` Docker volume
 
-```bash
-chmod +x deploy.sh rollback.sh backup-db.sh restore-db.sh
-./deploy.sh <backend-image-tag>
-```
-
-Firewall'da yalnizca `80` ve `443` herkese acilir. SSH, IP allowlist veya VPN
-ile sinirlanir. SQL Server `1433` portu production hostuna publish edilmez.
+`.env.server` Git'e eklenmez ve dosya izni `600` olarak tutulur. SQL Server
+`1433` portu hosta publish edilmez. Dis dunyaya yalnizca mevcut Caddy uzerinden
+HTTP/HTTPS trafigi acilir.
 
 ### Mevcut SSMS Veritabanini Ilk Kez Tasima
 
@@ -91,8 +99,16 @@ cd /opt/roomora/deploy
 ./deploy.sh <backend-image-tag>
 ```
 
-`restore-db.sh`, aktif production yuvasi olustuktan sonra calismayi reddeder.
-Canli veritabani degisimi yedek, bakim plani ve ayrica onay gerektirir.
+Paylasimli kurulumda geri yukleme komutu:
+
+```bash
+cd /opt/roomora/deploy
+./restore-shared-db.sh production <yedek.bak>
+./restore-shared-db.sh staging <yedek.bak>
+```
+
+Canli veritabani geri yuklemesi veri kaybina yol acabilecegi icin once mevcut
+veritabani ayrica yedeklenmeli ve API trafigi kontrollu durdurulmalidir.
 
 ## Veritabani Degisiklikleri
 
@@ -115,7 +131,8 @@ Uygulama hatasinda:
 
 ```bash
 cd /opt/roomora/deploy
-./rollback.sh
+./rollback-environment.sh staging
+./rollback-environment.sh production
 ```
 
 Rollback kodu geri alir. Veritabani migration'ini otomatik geri almaz. Bu
@@ -124,24 +141,38 @@ oncesi yedek alinir.
 
 ## Otomatik Yedek
 
-Cron ornegi:
+Kurulu cron:
 
 ```cron
-15 3 * * * /opt/roomora/deploy/backup-db.sh >> /var/log/roomora-backup.log 2>&1
+15 3 * * * cd /opt/roomora/deploy && ./backup-shared-db.sh >> /opt/roomora/backups/backup.log 2>&1
 ```
 
-Yedeklerin sunucu disinda sifreli ikinci bir konuma kopyalanmasi gerekir.
+Bu yedekler ayni sunucudadir. Sunucu arizasina karsi S3, Backblaze B2 veya
+baska bir sifreli uzak depoya ikinci kopya alinmasi zorunludur.
 
 ## GitHub Secrets
 
-Production environment altinda:
+Repository secret'lari:
 
 - `SERVER_HOST`
 - `SERVER_USER`
 - `SERVER_SSH_KEY`
 - `SERVER_KNOWN_HOSTS`
-- `GHCR_USER`
-- `GHCR_READ_TOKEN`
 
-Production environment icin required reviewer acilmasi onerilir. Boylece
-`main` branch'e push yapmak tek basina canli deploy baslatmaz.
+GitHub environment'lari:
+
+- `backend-staging`
+- `backend-production`
+
+Production icin daha sonra required reviewer acilabilir. Mevcut is akisi,
+istenen branch modeline uygun olarak `main` push'unda otomatik production
+dagitimi yapar.
+
+## Canliya Cikmadan Once
+
+1. `api.roomora.com` ve `testapi.roomora.com` A kayitlarini sunucu IP'sine yonelt.
+2. `.env.server` icinde gercek SMTP bilgilerini tanimla ve iki API ortamını
+   yeniden dagit. Aksi halde dogrulama ve sifre sifirlama e-postalari calismaz.
+3. Google ve Apple oturum acma kimliklerini hem backend hem mobil EAS
+   ortamlarinda tanimla.
+4. Veritabani yedeklerini sunucu disindaki sifreli bir depoya kopyala.

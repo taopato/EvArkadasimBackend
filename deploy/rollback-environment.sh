@@ -41,7 +41,7 @@ for attempt in $(seq 1 30); do
   sleep 2
 done
 
-sed -i -E "s|api-${ENVIRONMENT}-(blue|green):5118|api-${ENVIRONMENT}-${target}:5118|" Caddyfile.roomora
+sed -i -E "s#api-${ENVIRONMENT}-(blue|green):5118#api-${ENVIRONMENT}-${target}:5118#" Caddyfile.roomora
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T gateway \
   caddy validate --config - --adapter caddyfile < Caddyfile.roomora
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T gateway \
@@ -49,7 +49,7 @@ docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T gateway \
 
 if ! docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T gateway \
   wget -qO- --header="Host: ${domain}" http://127.0.0.1/health > /dev/null; then
-  sed -i -E "s|api-${ENVIRONMENT}-(blue|green):5118|api-${ENVIRONMENT}-${current}:5118|" Caddyfile.roomora
+  sed -i -E "s#api-${ENVIRONMENT}-(blue|green):5118#api-${ENVIRONMENT}-${current}:5118#" Caddyfile.roomora
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T gateway \
     caddy reload --config - --adapter caddyfile < Caddyfile.roomora
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" stop "$service"

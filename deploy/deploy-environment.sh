@@ -70,7 +70,7 @@ for attempt in $(seq 1 40); do
 done
 
 if grep -Eq "api-${ENVIRONMENT}-(blue|green):5118" Caddyfile.roomora; then
-  sed -i -E "s|api-${ENVIRONMENT}-(blue|green):5118|api-${ENVIRONMENT}-${target}:5118|" Caddyfile.roomora
+  sed -i -E "s#api-${ENVIRONMENT}-(blue|green):5118#api-${ENVIRONMENT}-${target}:5118#" Caddyfile.roomora
 else
   echo "Gateway upstream kaydi bulunamadi." >&2
   exit 1
@@ -85,7 +85,7 @@ if ! docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T gateway \
   wget -qO- --header="Host: ${domain}" http://127.0.0.1/health > /dev/null; then
   echo "Gateway saglik kontrolu basarisiz; eski yuva korunuyor." >&2
   if [[ -n "$current" && "$current" != "$target" ]]; then
-    sed -i -E "s|api-${ENVIRONMENT}-(blue|green):5118|api-${ENVIRONMENT}-${current}:5118|" Caddyfile.roomora
+    sed -i -E "s#api-${ENVIRONMENT}-(blue|green):5118#api-${ENVIRONMENT}-${current}:5118#" Caddyfile.roomora
     docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T gateway \
       caddy reload --config - --adapter caddyfile < Caddyfile.roomora
   fi

@@ -4,6 +4,12 @@ set -Eeuo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
+exec 9> .deployment.lock
+if ! flock -w 900 9; then
+  echo "Baska bir Roomora dagitimi tamamlanmadi." >&2
+  exit 1
+fi
+
 ENVIRONMENT="${1:?Kullanim: ./rollback-environment.sh <production|staging>}"
 ENV_FILE=".env.server"
 COMPOSE_FILE="compose.shared-server.yml"

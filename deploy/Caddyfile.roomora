@@ -1,10 +1,10 @@
 :80 {
-	@production host api.roomora.builtwhys.space api.roomora.com
+	@production host api.roomora.builtwhys.space
 	handle @production {
 		reverse_proxy api-production-blue:5118
 	}
 
-	@staging host testapi.roomora.builtwhys.space testapi.roomora.com
+	@staging host testapi.roomora.builtwhys.space
 	handle @staging {
 		reverse_proxy api-staging-blue:5118
 	}

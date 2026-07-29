@@ -21,9 +21,9 @@ if [[ "$ENVIRONMENT" != "production" && "$ENVIRONMENT" != "staging" ]]; then
 fi
 
 if [[ "$ENVIRONMENT" == "production" ]]; then
-  domain="${ROOMORA_PRODUCTION_DOMAIN:-api.roomora.com}"
+  domain="${ROOMORA_PRODUCTION_DOMAIN:-api.roomora.builtwhys.space}"
 else
-  domain="${ROOMORA_STAGING_DOMAIN:-testapi.roomora.com}"
+  domain="${ROOMORA_STAGING_DOMAIN:-testapi.roomora.builtwhys.space}"
 fi
 
 if [[ ! "$IMAGE_TAG" =~ ^[A-Za-z0-9_.-]+$ ]]; then

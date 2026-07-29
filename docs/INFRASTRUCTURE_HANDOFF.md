@@ -13,7 +13,7 @@ application is NOT ready for a public App Store or Google Play release yet.
 
 Public release blockers:
 
-1. `api.roomora.com` and `testapi.roomora.com` have no DNS A records.
+1. `api.roomora.builtwhys.space` and `testapi.roomora.builtwhys.space` require DNS A records pointing to the Roomora server.
 2. The server has placeholder SMTP configuration. Email verification and
    password reset cannot be considered operational.
 3. Real Google iOS/Android OAuth client IDs and Apple release credentials have
@@ -44,8 +44,8 @@ Environment mapping:
 
 | Git branch | Environment | API domain | Database |
 | --- | --- | --- | --- |
-| `development` | staging | `testapi.roomora.com` | `RoomoraStagingDb` |
-| `main` | production | `api.roomora.com` | `RoomoraDb` |
+| `development` | staging | `testapi.roomora.builtwhys.space` | `RoomoraStagingDb` |
+| `main` | production | `api.roomora.builtwhys.space` | `RoomoraDb` |
 
 ## Deployment Behavior
 
@@ -111,9 +111,9 @@ Configured EAS public variables:
 
 | EAS environment | `EXPO_PUBLIC_API_URL` |
 | --- | --- |
-| production | `https://api.roomora.com` |
-| preview | `https://testapi.roomora.com` |
-| development | `https://testapi.roomora.com` |
+| production | `https://api.roomora.builtwhys.space` |
+| preview | `https://testapi.roomora.builtwhys.space` |
+| development | `https://testapi.roomora.builtwhys.space` |
 
 Bundle identifiers:
 
@@ -150,26 +150,26 @@ ssh benim-sunucum
 cd /opt/roomora/deploy
 docker compose --env-file .env.server -f compose.shared-server.yml ps
 docker compose --env-file .env.server -f compose.shared-server.yml exec -T gateway \
-  wget -qO- --header='Host: api.roomora.com' http://127.0.0.1/health
+  wget -qO- --header='Host: api.roomora.builtwhys.space' http://127.0.0.1/health
 docker compose --env-file .env.server -f compose.shared-server.yml exec -T gateway \
-  wget -qO- --header='Host: testapi.roomora.com' http://127.0.0.1/health
+  wget -qO- --header='Host: testapi.roomora.builtwhys.space' http://127.0.0.1/health
 ```
 
 DNS and public HTTPS review:
 
 ```powershell
-Resolve-DnsName api.roomora.com -Type A
-Resolve-DnsName testapi.roomora.com -Type A
-curl.exe -fsS https://api.roomora.com/health
-curl.exe -fsS https://testapi.roomora.com/health
+Resolve-DnsName api.roomora.builtwhys.space -Type A
+Resolve-DnsName testapi.roomora.builtwhys.space -Type A
+curl.exe -fsS https://api.roomora.builtwhys.space/health
+curl.exe -fsS https://testapi.roomora.builtwhys.space/health
 ```
 
 Expected DNS records:
 
 | Type | Name | Value |
 | --- | --- | --- |
-| A | `api` | `65.109.139.24` |
-| A | `testapi` | `65.109.139.24` |
+| A | `api.roomora` | `65.109.139.24` |
+| A | `testapi.roomora` | `65.109.139.24` |
 
 Repository review:
 

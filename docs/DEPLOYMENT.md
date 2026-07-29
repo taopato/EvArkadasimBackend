@@ -15,9 +15,9 @@
 
 Roomora'nin paylasimli sunucu kurulumu `compose.shared-server.yml` kullanir:
 
-- `development` push'u image yayinlandiktan sonra `testapi.roomora.com`
+- `development` push'u image yayinlandiktan sonra `testapi.roomora.builtwhys.space`
   staging ortaminda blue-green deploy edilir.
-- `main` push'u image yayinlandiktan sonra `api.roomora.com` production
+- `main` push'u image yayinlandiktan sonra `api.roomora.builtwhys.space` production
   ortaminda blue-green deploy edilir.
 - Iki ortam ayri `RoomoraDb` ve `RoomoraStagingDb` veritabanlarini kullanir.
 - SQL Server ve OCR altyapisi kaynak kullanimi icin ortaktir; uygulama
@@ -43,8 +43,8 @@ Kurulu alan adlari ve veritabanlari:
 
 | Branch | Ortam | API | Veritabani |
 | --- | --- | --- | --- |
-| `development` | staging | `https://testapi.roomora.com` | `RoomoraStagingDb` |
-| `main` | production | `https://api.roomora.com` | `RoomoraDb` |
+| `development` | staging | `https://testapi.roomora.builtwhys.space` | `RoomoraStagingDb` |
+| `main` | production | `https://api.roomora.builtwhys.space` | `RoomoraDb` |
 
 Her iki alan adinin A kaydi `65.109.139.24` adresine yonelmelidir. DNS
 yayildiktan sonra sunucudaki Caddy HTTPS sertifikasini otomatik alir.
@@ -170,7 +170,7 @@ dagitimi yapar.
 
 ## Canliya Cikmadan Once
 
-1. `api.roomora.com` ve `testapi.roomora.com` A kayitlarini sunucu IP'sine yonelt.
+1. `api.roomora.builtwhys.space` ve `testapi.roomora.builtwhys.space` A kayitlarini sunucu IP'sine yonelt.
 2. `.env.server` icinde gercek SMTP bilgilerini tanimla ve iki API ortamını
    yeniden dagit. Aksi halde dogrulama ve sifre sifirlama e-postalari calismaz.
 3. Google ve Apple oturum acma kimliklerini hem backend hem mobil EAS

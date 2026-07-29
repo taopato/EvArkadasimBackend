@@ -1,5 +1,5 @@
 # BEGIN ROOMORA ROUTES
-api.roomora.com {
+api.roomora.builtwhys.space {
 	encode zstd gzip
 	reverse_proxy roomora-gateway:80
 	header {
@@ -11,7 +11,7 @@ api.roomora.com {
 	}
 }
 
-testapi.roomora.com {
+testapi.roomora.builtwhys.space {
 	encode zstd gzip
 	reverse_proxy roomora-gateway:80
 	header {

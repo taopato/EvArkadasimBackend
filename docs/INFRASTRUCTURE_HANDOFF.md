@@ -13,7 +13,8 @@ application is NOT ready for a public App Store or Google Play release yet.
 
 Public release blockers:
 
-1. `api.roomora.builtwhys.space` and `testapi.roomora.builtwhys.space` require DNS A records pointing to the Roomora server.
+1. Public API health and authentication flows must pass through the existing
+   `control.builtwhys.space` HTTPS endpoint before release.
 2. The server has placeholder SMTP configuration. Email verification and
    password reset cannot be considered operational.
 3. Real Google iOS/Android OAuth client IDs and Apple release credentials have
@@ -44,8 +45,8 @@ Environment mapping:
 
 | Git branch | Environment | API domain | Database |
 | --- | --- | --- | --- |
-| `development` | staging | `testapi.roomora.builtwhys.space` | `RoomoraStagingDb` |
-| `main` | production | `api.roomora.builtwhys.space` | `RoomoraDb` |
+| `development` | staging | `control.builtwhys.space/roomora-testapi` | `RoomoraStagingDb` |
+| `main` | production | `control.builtwhys.space/roomora-api` | `RoomoraDb` |
 
 ## Deployment Behavior
 
@@ -111,9 +112,9 @@ Configured EAS public variables:
 
 | EAS environment | `EXPO_PUBLIC_API_URL` |
 | --- | --- |
-| production | `https://api.roomora.builtwhys.space` |
-| preview | `https://testapi.roomora.builtwhys.space` |
-| development | `https://testapi.roomora.builtwhys.space` |
+| production | `https://control.builtwhys.space/roomora-api` |
+| preview | `https://control.builtwhys.space/roomora-testapi` |
+| development | `https://control.builtwhys.space/roomora-testapi` |
 
 Bundle identifiers:
 
@@ -155,21 +156,15 @@ docker compose --env-file .env.server -f compose.shared-server.yml exec -T gatew
   wget -qO- --header='Host: testapi.roomora.builtwhys.space' http://127.0.0.1/health
 ```
 
-DNS and public HTTPS review:
+Public HTTPS review:
 
 ```powershell
-Resolve-DnsName api.roomora.builtwhys.space -Type A
-Resolve-DnsName testapi.roomora.builtwhys.space -Type A
-curl.exe -fsS https://api.roomora.builtwhys.space/health
-curl.exe -fsS https://testapi.roomora.builtwhys.space/health
+curl.exe -fsS https://control.builtwhys.space/roomora-api/health
+curl.exe -fsS https://control.builtwhys.space/roomora-testapi/health
 ```
 
-Expected DNS records:
-
-| Type | Name | Value |
-| --- | --- | --- |
-| A | `api.roomora` | `65.109.139.24` |
-| A | `testapi.roomora` | `65.109.139.24` |
+No additional DNS records are required. Both APIs share the existing
+`control.builtwhys.space` certificate and are separated by path routing.
 
 Repository review:
 
@@ -190,7 +185,6 @@ npx eas-cli env:list --environment development
 An independent reviewer should approve release only after all of the following
 are demonstrated:
 
-- Both DNS records resolve to `65.109.139.24`.
 - Both public HTTPS health URLs return HTTP 200.
 - A real user can register, verify email, log in, reset password, and delete
   the account against production.

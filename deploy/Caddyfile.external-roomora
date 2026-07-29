@@ -1,25 +1,13 @@
-# BEGIN ROOMORA ROUTES
-api.roomora.builtwhys.space {
-	encode zstd gzip
-	reverse_proxy roomora-gateway:80
-	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
-		X-Content-Type-Options "nosniff"
-		X-Frame-Options "DENY"
-		Referrer-Policy "strict-origin-when-cross-origin"
-		-Server
+# Add these handlers inside the control.builtwhys.space site block, before its
+# generic control-center fallback handler.
+handle_path /roomora-api/* {
+	reverse_proxy roomora-gateway:80 {
+		header_up Host api.roomora.builtwhys.space
 	}
 }
 
-testapi.roomora.builtwhys.space {
-	encode zstd gzip
-	reverse_proxy roomora-gateway:80
-	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
-		X-Content-Type-Options "nosniff"
-		X-Frame-Options "DENY"
-		Referrer-Policy "strict-origin-when-cross-origin"
-		-Server
+handle_path /roomora-testapi/* {
+	reverse_proxy roomora-gateway:80 {
+		header_up Host testapi.roomora.builtwhys.space
 	}
 }
-# END ROOMORA ROUTES

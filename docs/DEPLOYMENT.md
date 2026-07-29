@@ -15,9 +15,9 @@
 
 Roomora'nin paylasimli sunucu kurulumu `compose.shared-server.yml` kullanir:
 
-- `development` push'u image yayinlandiktan sonra `testapi.roomora.builtwhys.space`
+- `development` push'u image yayinlandiktan sonra `https://control.builtwhys.space/roomora-testapi`
   staging ortaminda blue-green deploy edilir.
-- `main` push'u image yayinlandiktan sonra `api.roomora.builtwhys.space` production
+- `main` push'u image yayinlandiktan sonra `https://control.builtwhys.space/roomora-api` production
   ortaminda blue-green deploy edilir.
 - Iki ortam ayri `RoomoraDb` ve `RoomoraStagingDb` veritabanlarini kullanir.
 - SQL Server ve OCR altyapisi kaynak kullanimi icin ortaktir; uygulama
@@ -43,11 +43,11 @@ Kurulu alan adlari ve veritabanlari:
 
 | Branch | Ortam | API | Veritabani |
 | --- | --- | --- | --- |
-| `development` | staging | `https://testapi.roomora.builtwhys.space` | `RoomoraStagingDb` |
-| `main` | production | `https://api.roomora.builtwhys.space` | `RoomoraDb` |
+| `development` | staging | `https://control.builtwhys.space/roomora-testapi` | `RoomoraStagingDb` |
+| `main` | production | `https://control.builtwhys.space/roomora-api` | `RoomoraDb` |
 
-Her iki alan adinin A kaydi `65.109.139.24` adresine yonelmelidir. DNS
-yayildiktan sonra sunucudaki Caddy HTTPS sertifikasini otomatik alir.
+Her iki API, mevcut `control.builtwhys.space` HTTPS alan adi altinda farkli
+yollardan yayinlanir. Ayrica bir DNS kaydi veya sertifika gerekmez.
 
 ## Local Docker
 
@@ -170,7 +170,7 @@ dagitimi yapar.
 
 ## Canliya Cikmadan Once
 
-1. `api.roomora.builtwhys.space` ve `testapi.roomora.builtwhys.space` A kayitlarini sunucu IP'sine yonelt.
+1. Canli ve test API saglik adreslerinin HTTP 200 dondurdugunu dogrula.
 2. `.env.server` icinde gercek SMTP bilgilerini tanimla ve iki API ortamını
    yeniden dagit. Aksi halde dogrulama ve sifre sifirlama e-postalari calismaz.
 3. Google ve Apple oturum acma kimliklerini hem backend hem mobil EAS

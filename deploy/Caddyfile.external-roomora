@@ -1,5 +1,21 @@
-# Add these handlers inside the control.builtwhys.space site block, before its
-# generic control-center fallback handler.
+# Add these site blocks to the public Caddy instance. The internal Host header
+# selects the correct blue/green environment in the Roomora gateway.
+api.takosware.com {
+	encode zstd gzip
+	reverse_proxy roomora-gateway:80 {
+		header_up Host api.roomora.builtwhys.space
+	}
+}
+
+testapi.takosware.com {
+	encode zstd gzip
+	reverse_proxy roomora-gateway:80 {
+		header_up Host testapi.roomora.builtwhys.space
+	}
+}
+
+# Keep the former path routes during the transition so installed preview
+# builds do not stop working immediately.
 handle_path /roomora-api/* {
 	reverse_proxy roomora-gateway:80 {
 		header_up Host api.roomora.builtwhys.space

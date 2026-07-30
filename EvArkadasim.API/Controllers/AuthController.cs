@@ -11,6 +11,11 @@ using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.EntityFrameworkCore;
+using Persistence.Contexts;
+using Core.Security.JWT;
+using Domain.Entities;
+using System.Security.Cryptography;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http;
 using System.Text.Json;
@@ -23,12 +28,20 @@ namespace EvArkadasim.API.Controllers
     {
         private readonly IMediator _mediator;
         private readonly IConfiguration _configuration;
+        private readonly AppDbContext _dbContext;
+        private readonly ITokenHelper _tokenHelper;
         private static readonly HttpClient _httpClient = new HttpClient();
 
-        public AuthController(IMediator mediator, IConfiguration configuration)
+        public AuthController(
+            IMediator mediator,
+            IConfiguration configuration,
+            AppDbContext dbContext,
+            ITokenHelper tokenHelper)
         {
             _mediator = mediator;
             _configuration = configuration;
+            _dbContext = dbContext;
+            _tokenHelper = tokenHelper;
         }
 
         // A) Sadece kod doğrulama (reset akışı için)
@@ -61,6 +74,13 @@ namespace EvArkadasim.API.Controllers
                 InvitationToken = dto.InvitationToken?.Trim()
             };
             var res = await _mediator.Send(cmd);
+            if (res.Id.HasValue && !string.IsNullOrWhiteSpace(res.Token))
+            {
+                var refreshToken = CreateRefreshToken(res.Id.Value);
+                _dbContext.RefreshTokens.Add(refreshToken.Entity);
+                await _dbContext.SaveChangesAsync();
+                res.RefreshToken = refreshToken.RawToken;
+            }
             return Ok(res);
         }
 
@@ -102,7 +122,7 @@ namespace EvArkadasim.API.Controllers
                     Email = dto.Email?.Trim() ?? string.Empty,
                     Password = dto.Password
                 });
-                return Ok(result);
+                return Ok(await AttachRefreshTokenAsync(result));
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -154,7 +174,7 @@ namespace EvArkadasim.API.Controllers
                 FullName = fullName ?? payload.Email
             });
 
-            return Ok(result);
+            return Ok(await AttachRefreshTokenAsync(result));
         }
 
         [HttpPost("AppleLogin")]
@@ -207,7 +227,95 @@ namespace EvArkadasim.API.Controllers
                 FullName = dto.FullName ?? email
             });
 
-            return Ok(result);
+            return Ok(await AttachRefreshTokenAsync(result));
         }
+
+        [HttpPost("Refresh")]
+        public async Task<IActionResult> Refresh([FromBody] RefreshSessionRequest dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.RefreshToken))
+                return Unauthorized(new { message = "Oturum yenileme anahtarı geçersiz." });
+
+            var tokenHash = HashToken(dto.RefreshToken);
+            var stored = await _dbContext.RefreshTokens
+                .Include(token => token.User)
+                .FirstOrDefaultAsync(token => token.TokenHash == tokenHash);
+
+            if (stored is null || !stored.IsActive || !stored.User.IsActive)
+                return Unauthorized(new { message = "Oturumun süresi doldu. Lütfen yeniden giriş yap." });
+
+            stored.RevokedAt = DateTime.UtcNow;
+            var replacement = CreateRefreshToken(stored.UserId);
+            stored.ReplacedByTokenHash = replacement.Entity.TokenHash;
+            _dbContext.RefreshTokens.Add(replacement.Entity);
+            await _dbContext.SaveChangesAsync();
+
+            return Ok(ToLoginResponse(stored.User, replacement.RawToken));
+        }
+
+        [HttpPost("Logout")]
+        public async Task<IActionResult> Logout([FromBody] RefreshSessionRequest dto)
+        {
+            if (!string.IsNullOrWhiteSpace(dto.RefreshToken))
+            {
+                var tokenHash = HashToken(dto.RefreshToken);
+                var stored = await _dbContext.RefreshTokens
+                    .FirstOrDefaultAsync(token => token.TokenHash == tokenHash && token.RevokedAt == null);
+                if (stored is not null)
+                {
+                    stored.RevokedAt = DateTime.UtcNow;
+                    await _dbContext.SaveChangesAsync();
+                }
+            }
+            return NoContent();
+        }
+
+        private async Task<LoginResponseDto> AttachRefreshTokenAsync(LoginResponseDto response)
+        {
+            var created = CreateRefreshToken(response.Id);
+            _dbContext.RefreshTokens.Add(created.Entity);
+            await _dbContext.SaveChangesAsync();
+            response.RefreshToken = created.RawToken;
+            return response;
+        }
+
+        private LoginResponseDto ToLoginResponse(User user, string refreshToken)
+        {
+            var accessToken = _tokenHelper.CreateToken(user);
+            return new LoginResponseDto
+            {
+                Id = user.Id,
+                Email = user.Email,
+                FullName = $"{user.FirstName} {user.LastName}".Trim(),
+                PhoneNumber = user.PhoneNumber,
+                Iban = user.Iban,
+                ProfileImageUrl = user.ProfileImageUrl,
+                Token = accessToken.Token,
+                RefreshToken = refreshToken
+            };
+        }
+
+        private static (RefreshToken Entity, string RawToken) CreateRefreshToken(int userId)
+        {
+            var rawToken = Base64UrlEncoder.Encode(RandomNumberGenerator.GetBytes(64));
+            return (
+                new RefreshToken
+                {
+                    UserId = userId,
+                    TokenHash = HashToken(rawToken),
+                    CreatedAt = DateTime.UtcNow,
+                    ExpiresAt = DateTime.UtcNow.AddDays(90)
+                },
+                rawToken
+            );
+        }
+
+        private static string HashToken(string token) =>
+            Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token)));
+    }
+
+    public sealed class RefreshSessionRequest
+    {
+        public string RefreshToken { get; set; } = string.Empty;
     }
 }

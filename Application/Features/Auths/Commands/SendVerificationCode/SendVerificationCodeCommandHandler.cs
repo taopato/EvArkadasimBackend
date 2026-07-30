@@ -2,6 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Application.Features.Auths.Dtos;
+using Application.Common.Email;
 using Application.Services.Repositories;
 using Core.Interfaces;
 using Domain.Entities;
@@ -53,8 +54,8 @@ namespace Application.Features.Auths.Commands.SendVerificationCode
 
             await _mailService.SendEmailAsync(
                 request.Email,
-                "Doğrulama Kodunuz",
-                $"Kayıt kodunuz: {code}");
+                purpose == "reset" ? "Roomora şifre yenileme kodun" : "Roomora doğrulama kodun",
+                RoomoraEmailTemplate.VerificationCode(code, purpose));
 
             return new SendVerificationCodeResponseDto();
         }

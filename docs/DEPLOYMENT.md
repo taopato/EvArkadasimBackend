@@ -15,9 +15,9 @@
 
 Roomora'nin paylasimli sunucu kurulumu `compose.shared-server.yml` kullanir:
 
-- `development` push'u image yayinlandiktan sonra `https://control.builtwhys.space/roomora-testapi`
+- `development` push'u image yayinlandiktan sonra `https://testapi.takosware.com`
   staging ortaminda blue-green deploy edilir.
-- `main` push'u image yayinlandiktan sonra `https://control.builtwhys.space/roomora-api` production
+- `main` push'u image yayinlandiktan sonra `https://api.takosware.com` production
   ortaminda blue-green deploy edilir.
 - Iki ortam ayri `RoomoraDb` ve `RoomoraStagingDb` veritabanlarini kullanir.
 - SQL Server ve OCR altyapisi kaynak kullanimi icin ortaktir; uygulama
@@ -43,11 +43,11 @@ Kurulu alan adlari ve veritabanlari:
 
 | Branch | Ortam | API | Veritabani |
 | --- | --- | --- | --- |
-| `development` | staging | `https://control.builtwhys.space/roomora-testapi` | `RoomoraStagingDb` |
-| `main` | production | `https://control.builtwhys.space/roomora-api` | `RoomoraDb` |
+| `development` | staging | `https://testapi.takosware.com` | `RoomoraStagingDb` |
+| `main` | production | `https://api.takosware.com` | `RoomoraDb` |
 
-Her iki API, mevcut `control.builtwhys.space` HTTPS alan adi altinda farkli
-yollardan yayinlanir. Ayrica bir DNS kaydi veya sertifika gerekmez.
+Cloudflare DNS'te `api`, `testapi` ve `control` A kayitlari sunucu IP adresine
+yoneltilmelidir. Eski BuiltWhys yol adresleri yalniz gecici uyumluluk icindir.
 
 ## Local Docker
 
@@ -176,3 +176,17 @@ dagitimi yapar.
 3. Google ve Apple oturum acma kimliklerini hem backend hem mobil EAS
    ortamlarinda tanimla.
 4. Veritabani yedeklerini sunucu disindaki sifreli bir depoya kopyala.
+
+## Takosware DNS Ve E-posta
+
+Cloudflare'da su kayitlar gerekir:
+
+- `api` A -> sunucu IP adresi, proxy acik
+- `testapi` A -> sunucu IP adresi, proxy acik
+- `control` A -> sunucu IP adresi, proxy acik
+- E-posta saglayicisinin verdigi SPF ve DKIM kayitlari
+
+Takosware alan adini satin almak tek basina e-posta gonderimi saglamaz.
+Transactional e-posta saglayicisi alan adini dogruladiktan sonra SMTP
+bilgileri yalnizca `/opt/roomora/deploy/.env.server` icine yazilir. Kaynak
+koda, GitHub'a veya dokumantasyona parola/API anahtari eklenmez.

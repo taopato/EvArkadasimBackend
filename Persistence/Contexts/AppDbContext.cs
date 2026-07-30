@@ -34,6 +34,7 @@ namespace Persistence.Contexts
         public DbSet<ChargeCycleShare> ChargeCycleShares { get; set; } = null!;
         public DbSet<Receipt> Receipts { get; set; } = null!;
         public DbSet<ReceiptItem> ReceiptItems { get; set; } = null!;
+        public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -100,6 +101,18 @@ namespace Persistence.Contexts
 
             modelBuilder.Entity<HouseMember>()
                 .HasKey(hm => new { hm.HouseId, hm.UserId });
+
+            modelBuilder.Entity<RefreshToken>(token =>
+            {
+                token.Property(x => x.TokenHash).HasMaxLength(64).IsRequired();
+                token.Property(x => x.ReplacedByTokenHash).HasMaxLength(64);
+                token.HasIndex(x => x.TokenHash).IsUnique();
+                token.HasIndex(x => new { x.UserId, x.ExpiresAt });
+                token.HasOne(x => x.User)
+                    .WithMany()
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
 
             modelBuilder.Entity<HouseNoteSection>(section =>
             {

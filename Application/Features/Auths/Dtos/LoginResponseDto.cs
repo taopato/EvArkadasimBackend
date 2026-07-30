@@ -10,6 +10,7 @@ namespace Application.Features.Auths.Dtos
         public string? Iban { get; set; }
         public string? ProfileImageUrl { get; set; }
         public string Token { get; set; } = string.Empty;
+        public string RefreshToken { get; set; } = string.Empty;
         public string Message { get; set; } = "Giriş başarılı!";
     }
 }

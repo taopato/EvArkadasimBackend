@@ -1,6 +1,6 @@
 # Roomora Infrastructure Handoff
 
-Last verified: 2026-07-27
+Last verified: 2026-07-30
 
 This document is the source of truth for an independent infrastructure and
 release-readiness review. It intentionally contains no passwords, tokens, or
@@ -13,10 +13,11 @@ application is NOT ready for a public App Store or Google Play release yet.
 
 Public release blockers:
 
-1. Public API health and authentication flows must pass through the existing
-   `control.builtwhys.space` HTTPS endpoint before release.
-2. The server has placeholder SMTP configuration. Email verification and
-   password reset cannot be considered operational.
+1. Cloudflare DNS records for `api.takosware.com`, `testapi.takosware.com` and
+   `control.takosware.com` must be created and their public HTTPS health checks
+   must pass.
+2. A transactional email provider must verify `takosware.com`; its SMTP
+   credential must then be stored only in `/opt/roomora/deploy/.env.server`.
 3. Real Google iOS/Android OAuth client IDs and Apple release credentials have
    not been configured and verified.
 4. Mobile OTA/release automation is intentionally disabled until the first
@@ -45,8 +46,8 @@ Environment mapping:
 
 | Git branch | Environment | API domain | Database |
 | --- | --- | --- | --- |
-| `development` | staging | `control.builtwhys.space/roomora-testapi` | `RoomoraStagingDb` |
-| `main` | production | `control.builtwhys.space/roomora-api` | `RoomoraDb` |
+| `development` | staging | `testapi.takosware.com` | `RoomoraStagingDb` |
+| `main` | production | `api.takosware.com` | `RoomoraDb` |
 
 ## Deployment Behavior
 
@@ -112,9 +113,9 @@ Configured EAS public variables:
 
 | EAS environment | `EXPO_PUBLIC_API_URL` |
 | --- | --- |
-| production | `https://control.builtwhys.space/roomora-api` |
-| preview | `https://control.builtwhys.space/roomora-testapi` |
-| development | `https://control.builtwhys.space/roomora-testapi` |
+| production | `https://api.takosware.com` |
+| preview | `https://testapi.takosware.com` |
+| development | `https://testapi.takosware.com` |
 
 Bundle identifiers:
 
@@ -159,12 +160,33 @@ docker compose --env-file .env.server -f compose.shared-server.yml exec -T gatew
 Public HTTPS review:
 
 ```powershell
-curl.exe -fsS https://control.builtwhys.space/roomora-api/health
-curl.exe -fsS https://control.builtwhys.space/roomora-testapi/health
+curl.exe -fsS https://api.takosware.com/health
+curl.exe -fsS https://testapi.takosware.com/health
 ```
 
-No additional DNS records are required. Both APIs share the existing
-`control.builtwhys.space` certificate and are separated by path routing.
+The old `control.builtwhys.space` path routes remain only as a temporary
+compatibility fallback. Store builds use the Takosware hosts.
+
+## Control Center
+
+- Public host: `https://control.takosware.com`
+- Authentication: the owner account is configured through environment
+  variables; no plaintext password is stored in source control.
+- The Roomora page checks production API/database, staging API/database and OCR.
+- The control center has network-only access to Roomora services. SQL Server
+  and the Docker socket are not exposed to the panel.
+
+## Authentication And Email
+
+- Access tokens are short lived.
+- Refresh tokens are random, stored as SHA-256 hashes in SQL Server, rotated on
+  use and valid for 90 days unless revoked.
+- Mobile refresh tokens use native secure storage.
+- Logout revokes the active refresh token.
+- Verification, password reset, invitation and account deletion emails use the
+  responsive Roomora/Takosware template.
+- Sender authentication still requires external provider verification and the
+  required SPF/DKIM DNS records. Never commit the SMTP API key.
 
 Repository review:
 

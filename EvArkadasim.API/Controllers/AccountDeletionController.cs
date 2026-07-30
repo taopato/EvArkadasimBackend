@@ -8,6 +8,7 @@ using Microsoft.Extensions.Caching.Memory;
 using System.ComponentModel.DataAnnotations;
 using System.Security.Cryptography;
 using System.Text;
+using Application.Common.Email;
 
 namespace EvArkadasim.API.Controllers
 {
@@ -73,12 +74,10 @@ namespace EvArkadasim.API.Controllers
                     var token = CreateToken(user.Id);
                     var publicBaseUrl = ResolvePublicBaseUrl();
                     var deletionUrl = $"{publicBaseUrl}/account-deletion.html?token={Uri.EscapeDataString(token)}";
-                    var body = $"""
-                        <p>Roomora hesabını silme isteği aldık.</p>
-                        <p><a href="{deletionUrl}">Hesabımı kalıcı olarak sil</a></p>
-                        <p>Bu bağlantı 15 dakika geçerlidir. Bu isteği sen yapmadıysan e-postayı yok sayabilirsin.</p>
-                        """;
-                    await _mailService.SendEmailAsync(user.Email, "Roomora hesap silme bağlantısı", body);
+                    await _mailService.SendEmailAsync(
+                        user.Email,
+                        "Roomora hesap silme bağlantısı",
+                        RoomoraEmailTemplate.AccountDeletion(deletionUrl));
                 }
                 catch (Exception exception)
                 {

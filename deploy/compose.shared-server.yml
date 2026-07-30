@@ -10,7 +10,10 @@ x-api: &api
     SmtpSettings__Server: ${SMTP_SERVER}
     SmtpSettings__Port: ${SMTP_PORT:-587}
     SmtpSettings__SenderEmail: ${SMTP_SENDER_EMAIL}
+    SmtpSettings__Username: ${SMTP_USERNAME:-}
     SmtpSettings__Password: ${SMTP_PASSWORD}
+    SmtpSettings__DisplayName: ${SMTP_DISPLAY_NAME:-Roomora}
+    SmtpSettings__ReplyTo: ${SMTP_REPLY_TO:-}
     GoogleAuth__ClientIds__0: ${GOOGLE_CLIENT_ID}
     AppleAuth__BundleId: ${APPLE_BUNDLE_ID:-com.taopato.roomora}
     ReceiptOcr__PythonServiceUrl: http://ocr:8008

@@ -31,6 +31,11 @@ namespace Persistence.Security.JWT
             {
                 throw new InvalidOperationException("TokenOptions configuration is invalid.");
             }
+            if (Encoding.UTF8.GetByteCount(_tokenOptions.SecurityKey) < 64)
+            {
+                throw new InvalidOperationException(
+                    "TokenOptions:SecurityKey must be at least 64 bytes for HS512.");
+            }
         }
 
         public AccessToken CreateToken(User user)

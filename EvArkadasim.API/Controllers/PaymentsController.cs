@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+using Application.Services.Repositories;
 
 using Application.Features.Payments.Commands.CreatePayment;
 using Application.Features.Payments.Queries.GetPaymentList;
@@ -15,7 +17,6 @@ using Application.Features.Payments.Commands.ApprovePayment;
 using Application.Features.Payments.Commands.RejectPayment;
 using Application.Features.Payments.Commands.DeletePayment;
 using Domain.Enums;
-using Application.Features.Payments.Commands.AddPaymentWithAllocations;
 
 namespace EvArkadasim.API.Controllers
 {
@@ -39,17 +40,38 @@ namespace EvArkadasim.API.Controllers
     {
         private readonly IMediator _mediator;
         private readonly IWebHostEnvironment _env;
+        private readonly IHouseRepository _houseRepository;
+        private readonly IPaymentRepository _paymentRepository;
 
-        public PaymentsController(IMediator mediator, IWebHostEnvironment env)
+        public PaymentsController(
+            IMediator mediator,
+            IWebHostEnvironment env,
+            IHouseRepository houseRepository,
+            IPaymentRepository paymentRepository)
         {
             _mediator = mediator;
             _env = env;
+            _houseRepository = houseRepository;
+            _paymentRepository = paymentRepository;
         }
 
         [HttpPost("CreatePayment")]
         [DisableRequestSizeLimit]
         public async Task<IActionResult> CreatePayment([FromForm] CreatePaymentForm form)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null)
+                return Unauthorized();
+            if (form.BorcluUserId != currentUserId.Value)
+                return Forbid();
+            if (form.Tutar <= 0)
+                return BadRequest(new { message = "Ödeme tutarı sıfırdan büyük olmalıdır." });
+            if (form.BorcluUserId == form.AlacakliUserId)
+                return BadRequest(new { message = "Borçlu ve alacaklı aynı kişi olamaz." });
+            if (!await _houseRepository.IsActiveMemberAsync(form.HouseId, currentUserId.Value)
+                || !await _houseRepository.IsActiveMemberAsync(form.HouseId, form.AlacakliUserId))
+                return Forbid();
+
             var pmRaw = (form.PaymentMethod ?? "BankTransfer").Trim();
             var isCash = pmRaw.Equals("Cash", StringComparison.OrdinalIgnoreCase);
             var isTransfer = pmRaw.Equals("BankTransfer", StringComparison.OrdinalIgnoreCase);
@@ -95,6 +117,12 @@ namespace EvArkadasim.API.Controllers
         [HttpGet("GetPayments/{houseId}")]
         public async Task<IActionResult> GetPayments(int houseId)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null)
+                return Unauthorized();
+            if (!await _houseRepository.IsActiveMemberAsync(houseId, currentUserId.Value))
+                return Forbid();
+
             var list = await _mediator.Send(new GetPaymentListQuery { HouseId = houseId });
             return Ok(list);
         }
@@ -102,6 +130,12 @@ namespace EvArkadasim.API.Controllers
         [HttpGet("GetPendingPayments/{userId:int}")]
         public async Task<IActionResult> GetPendingPayments([FromRoute] int userId)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null)
+                return Unauthorized();
+            if (currentUserId.Value != userId)
+                return Forbid();
+
             var result = await _mediator.Send(new GetPendingPaymentsQuery(userId));
             return Ok(result);
         }
@@ -109,6 +143,16 @@ namespace EvArkadasim.API.Controllers
         [HttpPost("ApprovePayment/{paymentId:int}")]
         public async Task<IActionResult> ApprovePayment([FromRoute] int paymentId)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null)
+                return Unauthorized();
+
+            var payment = await _paymentRepository.GetByIdAsync(paymentId);
+            if (payment is null)
+                return NotFound(new { message = "Ödeme bulunamadı." });
+            if (payment.AlacakliUserId != currentUserId.Value)
+                return Forbid();
+
             var result = await _mediator.Send(new ApprovePaymentCommand(paymentId));
             return Ok(new { success = true, message = "Ödeme başarıyla onaylandı", data = result });
         }
@@ -116,23 +160,37 @@ namespace EvArkadasim.API.Controllers
         [HttpPost("RejectPayment/{paymentId:int}")]
         public async Task<IActionResult> RejectPayment([FromRoute] int paymentId)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null)
+                return Unauthorized();
+
+            var payment = await _paymentRepository.GetByIdAsync(paymentId);
+            if (payment is null)
+                return NotFound(new { message = "Ödeme bulunamadı." });
+            if (payment.AlacakliUserId != currentUserId.Value)
+                return Forbid();
+
             var result = await _mediator.Send(new RejectPaymentCommand(paymentId));
             return Ok(new { success = true, message = "Ödeme reddedildi", data = result });
         }
 
-        /// <summary>DELETE /api/Payments/{id}?requestingUserId=123 — Soft delete</summary>
+        /// <summary>DELETE /api/Payments/{id} — Soft delete</summary>
         [HttpDelete("{id:int}")]
-        public async Task<IActionResult> DeletePayment([FromRoute] int id, [FromQuery] int requestingUserId)
+        public async Task<IActionResult> DeletePayment([FromRoute] int id)
         {
-            await _mediator.Send(new DeletePaymentCommand(id, requestingUserId));
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null)
+                return Unauthorized();
+
+            await _mediator.Send(new DeletePaymentCommand(id, currentUserId.Value));
             return Ok(new { success = true, message = "Ödeme silindi." });
         }
 
-        [HttpPost("AddPaymentWithAllocations")]
-        public async Task<IActionResult> AddPaymentWithAllocations([FromBody] AddPaymentWithAllocationsDto dto)
+        private int? GetCurrentUserId()
         {
-            var res = await _mediator.Send(new AddPaymentWithAllocationsCommand { Model = dto });
-            return Ok(res);
+            var value = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? User.FindFirstValue("sub");
+            return int.TryParse(value, out var userId) && userId > 0 ? userId : null;
         }
     }
 }

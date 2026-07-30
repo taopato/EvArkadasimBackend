@@ -1,5 +1,6 @@
 using MediatR;
 using Application.Services.Repositories;
+using Core.Exceptions;
 
 namespace Application.Features.Houses.Commands.LeaveHouse
 {
@@ -30,7 +31,7 @@ namespace Application.Features.Houses.Commands.LeaveHouse
             bool isCreator = house.CreatorUserId == request.RequestingUserId;
 
             if (!isSelf && !isCreator)
-                throw new UnauthorizedAccessException("Bu işlemi yapmaya yetkiniz yok.");
+                throw new ForbiddenAccessException("Bu işlemi yapmaya yetkiniz yok.");
 
             // SOFT DELETE
             member.IsActive = false;

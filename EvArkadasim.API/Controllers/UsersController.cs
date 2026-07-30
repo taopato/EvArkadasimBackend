@@ -1,4 +1,3 @@
-using Application.Features.Users.Queries.GetAllUsers;
 using Application.Features.Users.Commands.UpdateProfile;
 using Application.Services.Repositories;
 using Application.Services.Accounts;
@@ -28,14 +27,6 @@ namespace WebAPI.Controllers
             _userRepository = userRepository;
             _environment = environment;
             _accountDeletionService = accountDeletionService;
-        }
-
-        [HttpGet("GetAllUsers")]
-        [Authorize]
-        public async Task<IActionResult> GetAllUsers()
-        {
-            var result = await _mediator.Send(new GetAllUsersQuery());
-            return Ok(result.Data);
         }
 
         /// <summary>

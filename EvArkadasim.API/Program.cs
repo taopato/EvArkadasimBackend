@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Core.Exceptions;
 using Persistence;
 using Core.Security.JWT;
 using Application.Features.Auths.Commands.SendVerificationCode;
@@ -76,6 +77,11 @@ if (IsMissingSecret(tokenOptions.SecurityKey) ||
 {
     throw new InvalidOperationException(
         "TokenOptions must contain a secure key, issuer, audience and a positive expiration value.");
+}
+if (Encoding.UTF8.GetByteCount(tokenOptions.SecurityKey) < 64)
+{
+    throw new InvalidOperationException(
+        "TokenOptions:SecurityKey must be at least 64 bytes for HS512.");
 }
 if (!builder.Environment.IsDevelopment() &&
     (IsMissingSecret(builder.Configuration["SmtpSettings:SenderEmail"]) ||
@@ -209,7 +215,11 @@ builder.WebHost.ConfigureKestrel(options =>
 {
     // The API is not published directly in production, but it must listen on
     // every container interface so the reverse proxy can reach it.
-    options.ListenAnyIP(5118);
+    var configuredPort = Environment.GetEnvironmentVariable("ROOMORA_HTTP_PORT");
+    var httpPort = int.TryParse(configuredPort, out var parsedPort) && parsedPort > 0
+        ? parsedPort
+        : 5118;
+    options.ListenAnyIP(httpPort);
 
     var runningInContainer = string.Equals(
         Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"),
@@ -274,10 +284,27 @@ app.UseExceptionHandler(exceptionApp =>
             return;
         }
 
+        if (exception is DbUpdateConcurrencyException)
+        {
+            context.Response.StatusCode = StatusCodes.Status409Conflict;
+            await context.Response.WriteAsJsonAsync(new
+            {
+                message = "Bu kayıt başka bir işlem tarafından güncellendi. Verileri yenileyip tekrar deneyin."
+            });
+            return;
+        }
+
         if (exception is InvalidOperationException invalidOperationException)
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             await context.Response.WriteAsJsonAsync(new { message = invalidOperationException.Message });
+            return;
+        }
+
+        if (exception is ForbiddenAccessException forbiddenAccessException)
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await context.Response.WriteAsJsonAsync(new { message = forbiddenAccessException.Message });
             return;
         }
 

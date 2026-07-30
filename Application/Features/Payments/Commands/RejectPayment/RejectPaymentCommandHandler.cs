@@ -3,6 +3,7 @@ using Domain.Enums;
 using MediatR;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
+using Core.Exceptions;
 
 namespace Application.Features.Payments.Commands.RejectPayment
 {
@@ -26,7 +27,7 @@ namespace Application.Features.Payments.Commands.RejectPayment
 
             // Yetki: sadece alacaklı kişi reddedebilir
             if (payment.AlacakliUserId != currentUserId)
-                throw new UnauthorizedAccessException("Bu ödemeyi reddetme yetkiniz yok.");
+                throw new ForbiddenAccessException("Bu ödemeyi reddetme yetkiniz yok.");
 
             if (payment.Status == PaymentStatus.Rejected)
                 throw new InvalidOperationException("Ödeme zaten reddedilmiş.");
@@ -38,6 +39,7 @@ namespace Application.Features.Payments.Commands.RejectPayment
             payment.RejectedByUserId = currentUserId;
 
             await _paymentRepo.UpdateAsync(payment);
+            await _paymentRepo.SaveChangesAsync();
 
             return new RejectPaymentResultDto
             {

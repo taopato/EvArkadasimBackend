@@ -1,5 +1,6 @@
 using Application.Services.Repositories;
 using MediatR;
+using Core.Exceptions;
 
 namespace Application.Features.Houses.Commands.DeleteHouse
 {
@@ -20,7 +21,7 @@ namespace Application.Features.Houses.Commands.DeleteHouse
                 ?? throw new KeyNotFoundException("Ev bulunamadı.");
 
             if (house.CreatorUserId != request.RequestingUserId)
-                throw new UnauthorizedAccessException("Sadece ev kurucusu evi silebilir.");
+                throw new ForbiddenAccessException("Sadece ev kurucusu evi silebilir.");
 
             // Tüm aktif üyeleri soft-delete ile çıkar
             var members = await _memberRepo.GetByHouseIdAsync(request.HouseId);

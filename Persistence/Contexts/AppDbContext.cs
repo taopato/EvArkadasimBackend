@@ -60,6 +60,7 @@ namespace Persistence.Contexts
             modelBuilder.Entity<Payment>(pb =>
             {
                 pb.Property(p => p.Tutar).HasPrecision(18, 2);
+                pb.Property(p => p.RowVersion).IsRowVersion();
 
                 // Enum int olarak saklanır, default BankTransfer
                 pb.Property(p => p.PaymentMethod)
@@ -196,6 +197,7 @@ namespace Persistence.Contexts
             {
                 le.Property(x => x.Amount).HasColumnType("decimal(18,2)");
                 le.Property(x => x.PaidAmount).HasColumnType("decimal(18,2)");
+                le.Property(x => x.RowVersion).IsRowVersion();
                 le.HasIndex(x => new { x.HouseId, x.FromUserId, x.ToUserId, x.CreatedAt });
             });
 

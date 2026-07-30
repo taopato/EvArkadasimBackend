@@ -14,6 +14,15 @@ testapi.takosware.com {
 	}
 }
 
+roomora.takosware.com {
+	@invitation path /davetiye-kabul
+	handle @invitation {
+		redir roomora:/{uri} 302
+	}
+
+	respond "Roomora" 200
+}
+
 # Keep the former path routes during the transition so installed preview
 # builds do not stop working immediately.
 handle_path /roomora-api/* {

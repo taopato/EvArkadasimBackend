@@ -42,7 +42,7 @@ namespace Application.Features.Invitations.Commands.SendInvitation
 
             await _invitationRepository.AddAsync(invitation);
 
-            var inviteLink = $"{_webBaseUrl}/davet-kabul?token={token}&houseId={request.HouseId}&email={Uri.EscapeDataString(request.Email)}";
+            var inviteLink = $"{_webBaseUrl}/davetiye-kabul?token={token}&houseId={request.HouseId}&email={Uri.EscapeDataString(request.Email)}";
 
             await _mailService.SendEmailAsync(
                 request.Email,

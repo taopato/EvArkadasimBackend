@@ -4,7 +4,7 @@ namespace Application.Common.Email;
 
 public static class RoomoraEmailTemplate
 {
-    public const string WordmarkContentId = "roomora-wordmark";
+    public const string LogoContentId = "roomora-logo";
 
     public static string VerificationCode(string code, string purpose)
     {
@@ -79,7 +79,8 @@ public static class RoomoraEmailTemplate
               .email-shell { padding:16px 8px !important; }
               .email-card { border-radius:8px !important; }
               .brand-header { padding:24px 22px 20px !important; }
-              .brand-image { width:210px !important; max-width:82% !important; }
+              .brand-logo { width:76px !important; height:76px !important; }
+              .brand-name { font-size:27px !important; }
               .email-body { padding:30px 24px 32px !important; }
               .email-title { font-size:27px !important; }
               .lead { font-size:15px !important; }
@@ -94,9 +95,18 @@ public static class RoomoraEmailTemplate
               <td class="email-shell" align="center" style="padding:38px 14px">
                 <table class="email-card" role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;background:#ffffff;border:1px solid #d9e4ec;border-radius:8px;overflow:hidden;box-shadow:0 8px 24px rgba(20,47,71,0.07)">
                   <tr>
-                    <td class="brand-header" align="center" style="padding:28px 30px 22px;background:#eaf3fb;border-bottom:1px solid #d6e6f3">
-                      <img class="brand-image" src="cid:{{WordmarkContentId}}" width="238" alt="Roomora" style="display:block;width:238px;max-width:86%;height:auto;border:0;outline:none;text-decoration:none">
-                      <div style="margin-top:7px;color:#56738c;font-size:12px;line-height:1.4">Ortak yaşamın kolay hali</div>
+                    <td class="brand-header" align="center" style="padding:24px 30px;background:#eaf3fb;border-bottom:1px solid #d6e6f3">
+                      <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto">
+                        <tr>
+                          <td width="84" valign="middle">
+                            <img class="brand-logo" src="cid:{{LogoContentId}}" width="84" height="84" alt="Roomora logosu" style="display:block;width:84px;height:84px;border:0;outline:none;text-decoration:none;border-radius:16px">
+                          </td>
+                          <td valign="middle" style="padding-left:17px;text-align:left">
+                            <div class="brand-name" style="color:#142f47;font-size:30px;line-height:1.1;font-weight:800">Roomora</div>
+                            <div style="margin-top:7px;color:#56738c;font-size:13px;line-height:1.4">Ortak yaşamın kolay hali</div>
+                          </td>
+                        </tr>
+                      </table>
                     </td>
                   </tr>
                   <tr>

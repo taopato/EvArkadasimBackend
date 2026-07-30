@@ -64,20 +64,20 @@ namespace Persistence.Services
                 AlternateView.CreateAlternateViewFromString(plainText, Encoding.UTF8, MediaTypeNames.Text.Plain));
 
             var htmlView = AlternateView.CreateAlternateViewFromString(body, Encoding.UTF8, MediaTypeNames.Text.Html);
-            var wordmarkPath = Path.Combine(
+            var logoPath = Path.Combine(
                 AppContext.BaseDirectory,
                 "wwwroot",
                 "brand",
-                "roomora-wordmark.png");
+                "roomora-logo.png");
 
-            if (File.Exists(wordmarkPath))
+            if (File.Exists(logoPath))
             {
-                var wordmark = new LinkedResource(wordmarkPath, MediaTypeNames.Image.Png)
+                var logo = new LinkedResource(logoPath, MediaTypeNames.Image.Png)
                 {
-                    ContentId = RoomoraEmailTemplate.WordmarkContentId,
+                    ContentId = RoomoraEmailTemplate.LogoContentId,
                     TransferEncoding = TransferEncoding.Base64
                 };
-                htmlView.LinkedResources.Add(wordmark);
+                htmlView.LinkedResources.Add(logo);
             }
 
             message.AlternateViews.Add(htmlView);

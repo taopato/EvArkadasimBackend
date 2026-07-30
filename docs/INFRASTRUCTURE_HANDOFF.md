@@ -185,8 +185,14 @@ compatibility fallback. Store builds use the Takosware hosts.
 - Logout revokes the active refresh token.
 - Verification, password reset, invitation and account deletion emails use the
   responsive Roomora/Takosware template.
-- Sender authentication still requires external provider verification and the
-  required SPF/DKIM DNS records. Never commit the SMTP API key.
+- `destek@takosware.com` is routed by Cloudflare Email Routing to the verified
+  owner mailbox. Incoming routing is free and independent from outbound SMTP.
+- Outbound transactional email is prepared for the Resend Free SMTP relay:
+  `smtp.resend.com:587`, username `resend`, sender
+  `Roomora <bildirim@takosware.com>`.
+- Resend must verify `takosware.com` with its generated SPF/DKIM DNS records
+  before arbitrary recipients can receive mail. Store the Resend API key only
+  as `SMTP_PASSWORD` in `/opt/roomora/deploy/.env.server`; never commit it.
 
 Repository review:
 

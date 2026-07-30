@@ -1,9 +1,12 @@
 ﻿// Persistence/Services/MailService.cs
 using Core.Interfaces;
+using Application.Common.Email;
 using Microsoft.Extensions.Configuration;
 using System.Net;
 using System.Net.Mail;
+using System.Net.Mime;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace Persistence.Services
@@ -48,17 +51,54 @@ namespace Persistence.Services
             {
                 From = new MailAddress(senderEmail, _displayName, Encoding.UTF8),
                 Subject = subject,
-                Body = body,
-                IsBodyHtml = true,
                 SubjectEncoding = Encoding.UTF8,
-                BodyEncoding = Encoding.UTF8
+                BodyEncoding = Encoding.UTF8,
+                HeadersEncoding = Encoding.UTF8
             };
             if (!string.IsNullOrWhiteSpace(_replyTo))
-                message.ReplyToList.Add(new MailAddress(_replyTo));
+                message.ReplyToList.Add(new MailAddress(_replyTo, "Roomora Destek", Encoding.UTF8));
             message.To.Add(to);
 
-            // Asenkron gönderim
+            var plainText = CreatePlainText(body);
+            message.AlternateViews.Add(
+                AlternateView.CreateAlternateViewFromString(plainText, Encoding.UTF8, MediaTypeNames.Text.Plain));
+
+            var htmlView = AlternateView.CreateAlternateViewFromString(body, Encoding.UTF8, MediaTypeNames.Text.Html);
+            var logoPath = Path.Combine(
+                AppContext.BaseDirectory,
+                "wwwroot",
+                "brand",
+                "roomora-logo.png");
+
+            if (File.Exists(logoPath))
+            {
+                var logo = new LinkedResource(logoPath, MediaTypeNames.Image.Png)
+                {
+                    ContentId = RoomoraEmailTemplate.LogoContentId,
+                    TransferEncoding = TransferEncoding.Base64
+                };
+                htmlView.LinkedResources.Add(logo);
+            }
+
+            message.AlternateViews.Add(htmlView);
             await client.SendMailAsync(message);
+        }
+
+        private static string CreatePlainText(string html)
+        {
+            var withBreaks = Regex.Replace(
+                html,
+                @"<(br|/p|/div|/h[1-6]|/tr)\b[^>]*>",
+                Environment.NewLine,
+                RegexOptions.IgnoreCase);
+            var withoutTags = Regex.Replace(withBreaks, "<[^>]+>", " ");
+            var decoded = WebUtility.HtmlDecode(withoutTags);
+            var compactLines = decoded
+                .Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None)
+                .Select(line => Regex.Replace(line, @"\s+", " ").Trim())
+                .Where(line => !string.IsNullOrWhiteSpace(line));
+
+            return string.Join(Environment.NewLine, compactLines);
         }
 
         private static string ResolveSetting(string? configuredValue, string fallbackValue)

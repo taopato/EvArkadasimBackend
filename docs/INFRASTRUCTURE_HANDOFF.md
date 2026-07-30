@@ -186,13 +186,15 @@ compatibility fallback. Store builds use the Takosware hosts.
 - Verification, password reset, invitation and account deletion emails use the
   responsive Roomora/Takosware template.
 - `destek@takosware.com` is routed by Cloudflare Email Routing to the verified
-  owner mailbox. Incoming routing is free and independent from outbound SMTP.
-- Outbound transactional email is prepared for the Resend Free SMTP relay:
+  `ttarikcetinturk@gmail.com` owner mailbox. Incoming routing is free and
+  independent from outbound SMTP.
+- Outbound transactional email is active on staging and production through the
+  Resend Free SMTP relay:
   `smtp.resend.com:587`, username `resend`, sender
   `Roomora <bildirim@takosware.com>`.
-- Resend must verify `takosware.com` with its generated SPF/DKIM DNS records
-  before arbitrary recipients can receive mail. Store the Resend API key only
-  as `SMTP_PASSWORD` in `/opt/roomora/deploy/.env.server`; never commit it.
+- `takosware.com` and its generated DKIM/SPF records are verified by Resend.
+  Store the Resend API key only as `SMTP_PASSWORD` in
+  `/opt/roomora/deploy/.env.server`; never commit it.
 
 Repository review:
 

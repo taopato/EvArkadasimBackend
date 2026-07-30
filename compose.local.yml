@@ -33,7 +33,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DefaultConnection: Server=db,1433;Database=RoomoraDb;User Id=sa;Password=${MSSQL_SA_PASSWORD:-Roomora_Local_2026!};TrustServerCertificate=True;Encrypt=False
-      TokenOptions__SecurityKey: ${TOKEN_SECURITY_KEY:-ROOMORA_LOCAL_ONLY_SECURITY_KEY_CHANGE_BEFORE_PRODUCTION_2026}
+      TokenOptions__SecurityKey: ${TOKEN_SECURITY_KEY:-ROOMORA_LOCAL_ONLY_SECURITY_KEY_CHANGE_BEFORE_PRODUCTION_2026_AT_LEAST_64_BYTES}
       TokenOptions__Issuer: roomora-local
       TokenOptions__Audience: roomora-local
       TokenOptions__AccessTokenExpiration: 60

@@ -10,6 +10,7 @@ using Domain.Entities;
 using MediatR;
 using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
+using Core.Exceptions;
 
 namespace Application.Features.Payments.Commands.ApprovePayment
 {
@@ -41,12 +42,14 @@ namespace Application.Features.Payments.Commands.ApprovePayment
 
             // YETKİ
             if (payment.AlacakliUserId != currentUserId)
-                throw new UnauthorizedAccessException("Bu ödemeyi onaylama yetkiniz yok.");
+                throw new ForbiddenAccessException("Bu ödemeyi onaylama yetkiniz yok.");
 
             if (payment.Status == PaymentStatus.Approved)
                 throw new InvalidOperationException("Ödeme zaten onaylanmış.");
             if (payment.Status == PaymentStatus.Rejected)
                 throw new InvalidOperationException("Reddedilmiş ödeme onaylanamaz.");
+            if (payment.Tutar <= 0)
+                throw new InvalidOperationException("Geçersiz ödeme tutarı.");
 
             // 1) FIFO açık ledger satırlarını çek (LINE)
             var openLines = await _ledgerRepo.ListOpenForPairAsync(
@@ -56,6 +59,10 @@ namespace Application.Features.Payments.Commands.ApprovePayment
             DateTime.UtcNow,
     ct
             );
+            var outstanding = openLines.Sum(line => Math.Max(0m, line.Amount - line.PaidAmount));
+            if (payment.Tutar > outstanding)
+                throw new InvalidOperationException(
+                    "Ödeme tutarı kalan açık borçtan büyük olduğu için onaylanamaz.");
 
             // 2) Tutarı FIFO paylaştır
             decimal remaining = payment.Tutar;
@@ -85,10 +92,13 @@ namespace Application.Features.Payments.Commands.ApprovePayment
                 line.IsClosed = line.PaidAmount >= line.Amount;
                 line.UpdatedAt = DateTime.UtcNow;
 
-                await _ledgerRepo.UpdateAsync(line, ct);
-
                 remaining -= apply;
             }
+
+            if (remaining > 0)
+                throw new InvalidOperationException("Ödemenin tamamı açık borçlara uygulanamadı.");
+
+            await _ledgerRepo.UpdateRangeAsync(openLines, ct);
 
             // 3) Allocation'ları topluca ekle
             if (allocations.Count > 0)
@@ -100,7 +110,7 @@ namespace Application.Features.Payments.Commands.ApprovePayment
             payment.ApprovedByUserId = currentUserId;
             await _paymentRepo.UpdateAsync(payment);
 
-            // 5) Kaydet
+            // Ledger, allocation ve payment değişiklikleri tek commit'te yazılır.
             await _paymentRepo.SaveChangesAsync();
 
             return new ApprovePaymentResultDto

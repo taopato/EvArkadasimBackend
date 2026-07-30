@@ -1,25 +1,38 @@
-# BEGIN ROOMORA ROUTES
-api.roomora.com {
+# Add these site blocks to the public Caddy instance. The internal Host header
+# selects the correct blue/green environment in the Roomora gateway.
+api.takosware.com {
 	encode zstd gzip
-	reverse_proxy roomora-gateway:80
-	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
-		X-Content-Type-Options "nosniff"
-		X-Frame-Options "DENY"
-		Referrer-Policy "strict-origin-when-cross-origin"
-		-Server
+	reverse_proxy roomora-gateway:80 {
+		header_up Host api.roomora.builtwhys.space
 	}
 }
 
-testapi.roomora.com {
+testapi.takosware.com {
 	encode zstd gzip
-	reverse_proxy roomora-gateway:80
-	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
-		X-Content-Type-Options "nosniff"
-		X-Frame-Options "DENY"
-		Referrer-Policy "strict-origin-when-cross-origin"
-		-Server
+	reverse_proxy roomora-gateway:80 {
+		header_up Host testapi.roomora.builtwhys.space
 	}
 }
-# END ROOMORA ROUTES
+
+roomora.takosware.com {
+	@invitation path /davetiye-kabul
+	handle @invitation {
+		redir roomora:/{uri} 302
+	}
+
+	respond "Roomora" 200
+}
+
+# Keep the former path routes during the transition so installed preview
+# builds do not stop working immediately.
+handle_path /roomora-api/* {
+	reverse_proxy roomora-gateway:80 {
+		header_up Host api.roomora.builtwhys.space
+	}
+}
+
+handle_path /roomora-testapi/* {
+	reverse_proxy roomora-gateway:80 {
+		header_up Host testapi.roomora.builtwhys.space
+	}
+}

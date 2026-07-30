@@ -33,7 +33,6 @@ namespace Persistence.Repositories
         public async Task<Payment> AddAsync(Payment entity)
         {
             var added = await _context.Payments.AddAsync(entity);
-            await _context.SaveChangesAsync();
             return added.Entity;
         }
 
@@ -80,7 +79,7 @@ namespace Persistence.Repositories
         public async Task UpdateAsync(Payment entity)
         {
             _context.Payments.Update(entity);
-            await _context.SaveChangesAsync();
+            await Task.CompletedTask;
         }
     }
 }

@@ -21,6 +21,11 @@ using System.Threading.Tasks;
 
 namespace WebAPI.Controllers
 {
+    public sealed class UploadHouseCoverForm
+    {
+        public IFormFile? Image { get; set; }
+    }
+
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
@@ -49,6 +54,12 @@ namespace WebAPI.Controllers
         [HttpGet("{houseId:int}")]
         public async Task<IActionResult> GetById(int houseId)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null)
+                return Unauthorized();
+            if (!await _houseRepository.IsActiveMemberAsync(houseId, currentUserId.Value))
+                return Forbid();
+
             try
             {
                 var house = await _houseRepository.GetByIdAsync(houseId);
@@ -68,8 +79,9 @@ namespace WebAPI.Controllers
 
         [HttpPost("{houseId:int}/CoverImage")]
         [RequestSizeLimit(8 * 1024 * 1024)]
-        public async Task<IActionResult> UploadCoverImage(int houseId, [FromForm] IFormFile image)
+        public async Task<IActionResult> UploadCoverImage(int houseId, [FromForm] UploadHouseCoverForm form)
         {
+            var image = form.Image;
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (!int.TryParse(userIdClaim, out var userId) || userId <= 0)
                 return Unauthorized(new { message = "Gecerli kullanici kimligi bulunamadi." });
@@ -144,6 +156,12 @@ namespace WebAPI.Controllers
         [HttpPost("{houseId}/invitations")]
         public async Task<IActionResult> SendInvitation(int houseId, [FromBody] SendInvitationRequestDto request)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null)
+                return Unauthorized();
+            if (!await _houseRepository.IsActiveMemberAsync(houseId, currentUserId.Value))
+                return Forbid();
+
             var command = new SendInvitationCommand { HouseId = houseId, Email = request.Email };
             var result = await _mediator.Send(command);
             return Ok(result);
@@ -220,6 +238,12 @@ namespace WebAPI.Controllers
         [HttpGet("{houseId}/members")]
         public async Task<IActionResult> GetHouseMembers(int houseId)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null)
+                return Unauthorized();
+            if (!await _houseRepository.IsActiveMemberAsync(houseId, currentUserId.Value))
+                return Forbid();
+
             var result = await _mediator.Send(new GetHouseMembersWithDebtsQuery { HouseId = houseId });
             return Ok(result);
         }
@@ -288,6 +312,12 @@ namespace WebAPI.Controllers
         [HttpGet("GetUserHouses/{userId}")]
         public async Task<IActionResult> GetUserHouses(int userId)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null)
+                return Unauthorized();
+            if (currentUserId.Value != userId)
+                return Forbid();
+
             var result = await _mediator.Send(new GetUserHousesQuery { UserId = userId });
             if (!result.Success) return BadRequest(result.Message);
             return Ok(result.Data);
@@ -296,6 +326,14 @@ namespace WebAPI.Controllers
         [HttpGet("GetUserDebts/{userId:int}/{houseId:int}")]
         public async Task<IActionResult> GetUserDebts(int userId, int houseId)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null)
+                return Unauthorized();
+            if (currentUserId.Value != userId)
+                return Forbid();
+            if (!await _houseRepository.IsActiveMemberAsync(houseId, currentUserId.Value))
+                return Forbid();
+
             var result = await _mediator.Send(new GetUserDebtsQuery(userId, houseId));
             return Ok(result);
         }
@@ -303,8 +341,25 @@ namespace WebAPI.Controllers
         [HttpGet("GetUserDebtBetween/{houseId:int}")]
         public async Task<IActionResult> GetUserDebtBetween(int houseId, [FromQuery] int userAId, [FromQuery] int userBId)
         {
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId is null)
+                return Unauthorized();
+            if (currentUserId.Value != userAId && currentUserId.Value != userBId)
+                return Forbid();
+            if (!await _houseRepository.IsActiveMemberAsync(houseId, currentUserId.Value)
+                || !await _houseRepository.IsActiveMemberAsync(houseId, userAId)
+                || !await _houseRepository.IsActiveMemberAsync(houseId, userBId))
+                return Forbid();
+
             var result = await _mediator.Send(new GetUserDebtBetweenQuery { HouseId = houseId, UserAId = userAId, UserBId = userBId });
             return Ok(result);
+        }
+
+        private int? GetCurrentUserId()
+        {
+            var value = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? User.FindFirstValue("sub");
+            return int.TryParse(value, out var userId) && userId > 0 ? userId : null;
         }
     }
 }

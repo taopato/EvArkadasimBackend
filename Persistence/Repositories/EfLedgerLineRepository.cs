@@ -29,7 +29,13 @@ namespace Persistence.Repositories
         public async Task UpdateAsync(LedgerLine line, CancellationToken ct = default)
         {
             _ctx.LedgerLines.Update(line);
-            await _ctx.SaveChangesAsync(ct);
+            await Task.CompletedTask;
+        }
+
+        public Task UpdateRangeAsync(IEnumerable<LedgerLine> lines, CancellationToken ct = default)
+        {
+            _ctx.LedgerLines.UpdateRange(lines);
+            return Task.CompletedTask;
         }
 
         public Task SaveChangesAsync(CancellationToken ct = default)
@@ -77,7 +83,6 @@ namespace Persistence.Repositories
                             && !x.IsClosed
                             && x.PostDate <= asOf)
                    .OrderBy(x => x.Id) // FIFO
-                   .AsNoTracking()
                    .ToListAsync(ct);
 
         public async Task SoftDeleteByExpenseIdAsync(int expenseId, CancellationToken ct = default)

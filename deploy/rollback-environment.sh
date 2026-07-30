@@ -21,9 +21,9 @@ if [[ "$ENVIRONMENT" != "production" && "$ENVIRONMENT" != "staging" ]]; then
 fi
 
 if [[ "$ENVIRONMENT" == "production" ]]; then
-  domain="${ROOMORA_PRODUCTION_DOMAIN:-api.roomora.com}"
+  domain="${ROOMORA_PRODUCTION_DOMAIN:-api.takosware.com}"
 else
-  domain="${ROOMORA_STAGING_DOMAIN:-testapi.roomora.com}"
+  domain="${ROOMORA_STAGING_DOMAIN:-testapi.takosware.com}"
 fi
 
 current="$(tr -d '[:space:]' < "$active_file")"

@@ -1,5 +1,6 @@
 using MediatR;
 using Application.Services.Repositories;
+using Core.Exceptions;
 
 namespace Application.Features.Payments.Commands.DeletePayment
 {
@@ -19,7 +20,7 @@ namespace Application.Features.Payments.Commands.DeletePayment
 
             // Sadece ödemeyi ekleyen kişi silebilir
             if (payment.BorcluUserId != request.RequestingUserId)
-                throw new UnauthorizedAccessException("Bu ödemeyi silme yetkiniz yok.");
+                throw new ForbiddenAccessException("Bu ödemeyi silme yetkiniz yok.");
 
             // Onaylanmış ödeme silinmez
             if (payment.Status == Domain.Enums.PaymentStatus.Approved)

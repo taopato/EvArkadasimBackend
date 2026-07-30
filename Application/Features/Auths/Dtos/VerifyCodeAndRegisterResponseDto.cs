@@ -8,6 +8,7 @@ namespace Application.Features.Auths.Dtos
         public string? Email { get; set; }
         public string? FullName { get; set; }
         public string? Token { get; set; }
+        public string? RefreshToken { get; set; }
         /// <summary>
         /// Davet linki ile kayıt olduysa, kullanıcının eklendiği evin ID'si.
         /// Frontend bu değere göre kullanıcıyı direkt ilgili evin ekranına yönlendirir.

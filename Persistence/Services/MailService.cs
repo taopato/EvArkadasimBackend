@@ -3,6 +3,7 @@ using Core.Interfaces;
 using Microsoft.Extensions.Configuration;
 using System.Net;
 using System.Net.Mail;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace Persistence.Services
@@ -15,7 +16,10 @@ namespace Persistence.Services
         private readonly string _smtpServer;
         private readonly int _smtpPort;
         private readonly string _senderEmail;
+        private readonly string _smtpUsername;
         private readonly string _senderPassword;
+        private readonly string _displayName;
+        private readonly string? _replyTo;
 
         public MailService(IConfiguration configuration)
         {
@@ -24,7 +28,10 @@ namespace Persistence.Services
                 ? configuredPort
                 : DefaultSmtpPort;
             _senderEmail = ResolveSetting(configuration["SmtpSettings:SenderEmail"], string.Empty);
+            _smtpUsername = ResolveSetting(configuration["SmtpSettings:Username"], _senderEmail);
             _senderPassword = ResolveSetting(configuration["SmtpSettings:Password"], string.Empty);
+            _displayName = ResolveSetting(configuration["SmtpSettings:DisplayName"], "Roomora");
+            _replyTo = ResolveSetting(configuration["SmtpSettings:ReplyTo"], string.Empty);
         }
 
         public async Task SendEmailAsync(string to, string subject, string body)
@@ -33,17 +40,21 @@ namespace Persistence.Services
             var senderPassword = RequireSetting(_senderPassword, "SmtpSettings:Password");
             using var client = new SmtpClient(_smtpServer, _smtpPort)
             {
-                Credentials = new NetworkCredential(senderEmail, senderPassword),
+                Credentials = new NetworkCredential(RequireSetting(_smtpUsername, "SmtpSettings:Username"), senderPassword),
                 EnableSsl = true
             };
 
             using var message = new MailMessage
             {
-                From = new MailAddress(senderEmail),
+                From = new MailAddress(senderEmail, _displayName, Encoding.UTF8),
                 Subject = subject,
                 Body = body,
-                IsBodyHtml = true
+                IsBodyHtml = true,
+                SubjectEncoding = Encoding.UTF8,
+                BodyEncoding = Encoding.UTF8
             };
+            if (!string.IsNullOrWhiteSpace(_replyTo))
+                message.ReplyToList.Add(new MailAddress(_replyTo));
             message.To.Add(to);
 
             // Asenkron gönderim

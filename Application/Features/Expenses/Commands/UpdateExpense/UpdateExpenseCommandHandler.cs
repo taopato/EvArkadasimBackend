@@ -62,14 +62,34 @@ namespace Application.Features.Expenses.Commands.UpdateExpense
             if (Math.Abs((sharedAmount + personalTotal) - request.Dto.Tutar) > 0.01m)
                 throw new InvalidOperationException("Ortak ve kişisel payların toplamı harcama tutarına eşit olmalıdır.");
 
-            var participants = (await _houseMemberRepo.GetActiveUserIdsAsync(expense.HouseId, ct))
+            var activeMembers = (await _houseMemberRepo.GetActiveUserIdsAsync(expense.HouseId, ct))
                 .Distinct()
                 .OrderBy(id => id)
                 .ToList();
-            if (participants.Count == 0)
+            if (activeMembers.Count == 0)
                 throw new InvalidOperationException("Aktif ev üyesi bulunamadı.");
+
+            var requestedParticipants = (request.Dto.Participants ?? new List<int>())
+                .Where(id => id > 0)
+                .Distinct()
+                .OrderBy(id => id)
+                .ToList();
+            if (requestedParticipants.Any(id => !activeMembers.Contains(id)))
+                throw new InvalidOperationException("Seçilen katılımcılardan biri bu evin aktif üyesi değil.");
+
+            var participants = requestedParticipants.Count > 0
+                ? requestedParticipants
+                : expense.Shares
+                    .Select(share => share.UserId)
+                    .Where(activeMembers.Contains)
+                    .Distinct()
+                    .OrderBy(id => id)
+                    .ToList();
+            if (participants.Count == 0)
+                participants = activeMembers;
+
             if (personalItems.Any(item => !participants.Contains(item.UserId)))
-                throw new InvalidOperationException("Kişisel harcamalar yalnızca aktif ev üyelerine atanabilir.");
+                throw new InvalidOperationException("Kişisel kalemler yalnızca seçilen katılımcılara atanabilir.");
 
             expense.Tur = request.Dto.Tur;
             expense.Tutar = request.Dto.Tutar;
@@ -84,11 +104,11 @@ namespace Application.Features.Expenses.Commands.UpdateExpense
                 expense.DueDate = request.Dto.DueDate.Value;
             if (request.Dto.OdeyenUserId.HasValue)
             {
-                if (!participants.Contains(request.Dto.OdeyenUserId.Value))
+                if (!activeMembers.Contains(request.Dto.OdeyenUserId.Value))
                     throw new InvalidOperationException("Ödeyen kişi bu evin aktif bir üyesi olmalıdır.");
                 expense.OdeyenUserId = request.Dto.OdeyenUserId.Value;
             }
-            else if (!participants.Contains(expense.OdeyenUserId))
+            else if (!activeMembers.Contains(expense.OdeyenUserId))
             {
                 throw new InvalidOperationException("Mevcut ödeyen kişi artık bu evin aktif bir üyesi değil.");
             }

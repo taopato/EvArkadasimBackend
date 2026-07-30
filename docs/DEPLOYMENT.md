@@ -15,9 +15,9 @@
 
 Roomora'nin paylasimli sunucu kurulumu `compose.shared-server.yml` kullanir:
 
-- `development` push'u image yayinlandiktan sonra `testapi.roomora.com`
+- `development` push'u image yayinlandiktan sonra `https://testapi.takosware.com`
   staging ortaminda blue-green deploy edilir.
-- `main` push'u image yayinlandiktan sonra `api.roomora.com` production
+- `main` push'u image yayinlandiktan sonra `https://api.takosware.com` production
   ortaminda blue-green deploy edilir.
 - Iki ortam ayri `RoomoraDb` ve `RoomoraStagingDb` veritabanlarini kullanir.
 - SQL Server ve OCR altyapisi kaynak kullanimi icin ortaktir; uygulama
@@ -43,11 +43,11 @@ Kurulu alan adlari ve veritabanlari:
 
 | Branch | Ortam | API | Veritabani |
 | --- | --- | --- | --- |
-| `development` | staging | `https://testapi.roomora.com` | `RoomoraStagingDb` |
-| `main` | production | `https://api.roomora.com` | `RoomoraDb` |
+| `development` | staging | `https://testapi.takosware.com` | `RoomoraStagingDb` |
+| `main` | production | `https://api.takosware.com` | `RoomoraDb` |
 
-Her iki alan adinin A kaydi `65.109.139.24` adresine yonelmelidir. DNS
-yayildiktan sonra sunucudaki Caddy HTTPS sertifikasini otomatik alir.
+Cloudflare DNS'te `api`, `testapi` ve `control` A kayitlari sunucu IP adresine
+yoneltilmelidir. Eski BuiltWhys yol adresleri yalniz gecici uyumluluk icindir.
 
 ## Local Docker
 
@@ -170,9 +170,23 @@ dagitimi yapar.
 
 ## Canliya Cikmadan Once
 
-1. `api.roomora.com` ve `testapi.roomora.com` A kayitlarini sunucu IP'sine yonelt.
+1. Canli ve test API saglik adreslerinin HTTP 200 dondurdugunu dogrula.
 2. `.env.server` icinde gercek SMTP bilgilerini tanimla ve iki API ortamını
    yeniden dagit. Aksi halde dogrulama ve sifre sifirlama e-postalari calismaz.
 3. Google ve Apple oturum acma kimliklerini hem backend hem mobil EAS
    ortamlarinda tanimla.
 4. Veritabani yedeklerini sunucu disindaki sifreli bir depoya kopyala.
+
+## Takosware DNS Ve E-posta
+
+Cloudflare'da su kayitlar gerekir:
+
+- `api` A -> sunucu IP adresi, proxy acik
+- `testapi` A -> sunucu IP adresi, proxy acik
+- `control` A -> sunucu IP adresi, proxy acik
+- E-posta saglayicisinin verdigi SPF ve DKIM kayitlari
+
+Takosware alan adini satin almak tek basina e-posta gonderimi saglamaz.
+Transactional e-posta saglayicisi alan adini dogruladiktan sonra SMTP
+bilgileri yalnizca `/opt/roomora/deploy/.env.server` icine yazilir. Kaynak
+koda, GitHub'a veya dokumantasyona parola/API anahtari eklenmez.

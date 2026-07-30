@@ -11,8 +11,9 @@ namespace Application.Features.Expenses.Dtos
         public System.DateTime? PostDate { get; set; }
         public System.DateTime? DueDate { get; set; }
         public int? OdeyenUserId { get; set; }
+        public List<int> Participants { get; set; } = new();
 
-        // Şahsi kalemler
+        // Şahsi kalemler yalnızca seçilen katılımcılara atanabilir.
         public List<PersonalExpenseDto> SahsiHarcamalar { get; set; } = new();
 
         // 🔹 Not/Açıklama – FE farklı anahtarlar gönderebildiği için hepsini destekle

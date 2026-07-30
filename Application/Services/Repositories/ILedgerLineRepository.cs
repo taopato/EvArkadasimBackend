@@ -12,6 +12,7 @@ namespace Application.Services.Repositories
         Task AddAsync(LedgerLine line, CancellationToken ct = default);
         Task AddRangeAsync(IEnumerable<LedgerLine> lines, CancellationToken ct = default);
         Task UpdateAsync(LedgerLine line, CancellationToken ct = default);
+        Task UpdateRangeAsync(IEnumerable<LedgerLine> lines, CancellationToken ct = default);
         Task SaveChangesAsync(CancellationToken ct = default);
 
         Task<LedgerLine?> GetByIdAsync(long id, CancellationToken ct = default);

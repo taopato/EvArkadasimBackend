@@ -48,6 +48,15 @@ namespace Application.Features.Expenses.Queries.GetExpense
                     Tutar = pe.Tutar
                 })
                 .ToList();
+            dto.Shares = e.Shares
+                .Where(share => share.UserId > 0)
+                .Select(share => new ShareDto
+                {
+                    UserId = share.UserId,
+                    PaylasimTutar = share.PaylasimTutar
+                })
+                .OrderBy(share => share.UserId)
+                .ToList();
 
             dto.OrtakHarcamaTutari = e.OrtakHarcamaTutari;
 

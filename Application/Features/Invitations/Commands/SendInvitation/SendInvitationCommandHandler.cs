@@ -1,4 +1,5 @@
 using Application.Features.Invitations.Dtos;
+using Application.Common.Email;
 using Application.Services.Repositories;
 using Core.Interfaces;
 using Core.Utilities.Results;
@@ -21,7 +22,7 @@ namespace Application.Features.Invitations.Commands.SendInvitation
         {
             _invitationRepository = invitationRepository;
             _mailService = mailService;
-            _webBaseUrl = (configuration["AppUrls:WebBaseUrl"] ?? "https://www.evarkadasim.co").TrimEnd('/');
+            _webBaseUrl = (configuration["AppUrls:WebBaseUrl"] ?? "https://roomora.takosware.com").TrimEnd('/');
         }
 
         public async Task<Response<SendInvitationResponseDto>> Handle(SendInvitationCommand request, CancellationToken cancellationToken)
@@ -41,30 +42,12 @@ namespace Application.Features.Invitations.Commands.SendInvitation
 
             await _invitationRepository.AddAsync(invitation);
 
-            var inviteLink = $"{_webBaseUrl}/davet-kabul?token={token}&houseId={request.HouseId}&email={Uri.EscapeDataString(request.Email)}";
+            var inviteLink = $"{_webBaseUrl}/davetiye-kabul?token={token}&houseId={request.HouseId}&email={Uri.EscapeDataString(request.Email)}";
 
-            var subject = "EvArkadasim - Eve Davet Edildiniz!";
-            var body = $@"
-<div style=""font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;"">
-    <h2 style=""color: #4CAF50;"">Merhaba,</h2>
-    <p>Sizi ev grubuna katılmaya davet ettiler!</p>
-    <p>Aşağıdaki butona tıklayarak hızlıca kayıt olun ve direkt eve dahil olun:</p>
-    <div style=""text-align: center; margin: 30px 0;"">
-        <a href=""{inviteLink}"" style=""background-color: #4CAF50; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;"">
-            Daveti Kabul Et
-        </a>
-    </div>
-    <p style=""font-size: 0.85em; color: #666;"">
-        Eğer yukarıdaki buton çalışmıyorsa, şu linki tarayıcınıza yapıştırabilirsiniz:<br>
-        <a href=""{inviteLink}"" style=""color: #2196F3; word-break: break-all;"">{inviteLink}</a>
-    </p>
-    <p>Link <b>{expiresAt:dd.MM.yyyy}</b> tarihine kadar geçerlidir.</p>
-    <hr style=""border: none; border-top: 1px solid #eee; margin: 20px 0;"">
-    <p style=""font-size: 0.9em;"">EvArkadasim uygulaması ile ev arkadaşlarınızla harcamalarınızı kolayca takip edin.</p>
-    <p>Saygılarımızla,<br><strong>EvArkadasim Ekibi</strong></p>
-</div>";
-
-            await _mailService.SendEmailAsync(request.Email, subject, body);
+            await _mailService.SendEmailAsync(
+                request.Email,
+                "Roomora ev davetin",
+                RoomoraEmailTemplate.Invitation(inviteLink, expiresAt));
 
             var response = new SendInvitationResponseDto
             {

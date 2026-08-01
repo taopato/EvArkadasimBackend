@@ -16,6 +16,8 @@ namespace Application.Features.Expenses.Commands.CreateExpense
         public int KaydedenUserId { get; set; }
         public decimal OrtakHarcamaTutari { get; set; }
         public DateTime Date { get; set; }                 // eski akışta kullanılır
+        public DateTime? PostDate { get; set; }            // faturanın sisteme yansıyacağı tarih
+        public DateTime? DueDate { get; set; }             // son ödeme tarihi
 
         public PaylasimTuru PaylasimTuru { get; set; }     // kullanılmasa da dursun
         public List<PersonalExpenseDto> SahsiHarcamalar { get; set; } = new();

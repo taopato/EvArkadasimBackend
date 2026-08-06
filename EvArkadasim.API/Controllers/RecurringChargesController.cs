@@ -13,6 +13,7 @@ public sealed class CreateScheduledChargeRequest
 {
     public int HouseId { get; set; }
     public string? Title { get; set; }
+    public string? Note { get; set; }
     public ChargeType Type { get; set; }
     public int PayerUserId { get; set; }
     public decimal FixedAmount { get; set; }
@@ -99,6 +100,7 @@ public class RecurringChargesController : ControllerBase
             HouseId = request.HouseId,
             Type = request.Type,
             Title = string.IsNullOrWhiteSpace(request.Title) ? TypeLabel(request.Type) : request.Title.Trim(),
+            Note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim(),
             PayerUserId = request.PayerUserId,
             CreatedByUserId = currentUserId.Value,
             AmountMode = AmountMode.Fixed,
@@ -398,6 +400,7 @@ public class RecurringChargesController : ControllerBase
             plan.Id,
             plan.HouseId,
             plan.Title,
+            plan.Note,
             type = plan.Type.ToString(),
             fixedAmount = plan.FixedAmount ?? 0m,
             plan.PayerUserId,

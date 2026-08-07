@@ -188,6 +188,38 @@ public class HouseNotesController : ControllerBase
         return Ok(new { success = true });
     }
 
+    [HttpPut("sections/{sectionId:int}")]
+    public async Task<IActionResult> UpdateSection(int sectionId, [FromBody] UpdateHouseNoteSectionRequest request)
+    {
+        var userId = GetCurrentUserId();
+        if (userId <= 0)
+        {
+            return Unauthorized(new { message = "Geçerli kullanıcı bulunamadı." });
+        }
+
+        var section = await _houseNoteRepository.GetSectionByIdAsync(sectionId);
+        if (section == null || section.DeletedAt != null)
+        {
+            return NotFound(new { message = "Not başlığı bulunamadı." });
+        }
+
+        if (!await _houseRepository.IsActiveMemberAsync(section.HouseId, userId))
+        {
+            return Forbid();
+        }
+
+        var title = (request.Title ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            return BadRequest(new { message = "Başlık boş olamaz." });
+        }
+
+        section.Title = title;
+        await _houseNoteRepository.SaveChangesAsync();
+
+        return Ok(new { id = section.Id, title = section.Title });
+    }
+
     [HttpDelete("sections/{sectionId:int}")]
     public async Task<IActionResult> DeleteSection(int sectionId)
     {
@@ -245,5 +277,10 @@ public class HouseNotesController : ControllerBase
     public sealed class CreateHouseNoteItemRequest
     {
         public string? Content { get; set; }
+    }
+
+    public sealed class UpdateHouseNoteSectionRequest
+    {
+        public string? Title { get; set; }
     }
 }

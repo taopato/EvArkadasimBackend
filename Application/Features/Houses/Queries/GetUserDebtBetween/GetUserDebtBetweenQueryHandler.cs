@@ -57,10 +57,11 @@ namespace Application.Features.Houses.Queries.GetUserDebtBetween
             foreach (var expenseId in lines
                 .OrderByDescending(line => line.PostDate)
                 .Select(line => line.ExpenseId)
+                .Where(expenseId => expenseId.HasValue)
                 .Distinct()
                 .Take(6))
             {
-                var expense = await _expenseRepo.GetByIdAsync(expenseId);
+                var expense = await _expenseRepo.GetByIdAsync(expenseId!.Value);
                 if (expense is null) continue;
                 recentExpenses.Add(new PairExpenseItemDto
                 {

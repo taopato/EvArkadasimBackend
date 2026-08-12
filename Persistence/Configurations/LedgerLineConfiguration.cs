@@ -22,7 +22,16 @@ namespace Persistence.Configurations
              .HasForeignKey(x => x.ExpenseId)
              .OnDelete(DeleteBehavior.Cascade);
 
+            b.HasOne<Payment>()
+             .WithMany()
+             .HasForeignKey(x => x.SourcePaymentId)
+             .OnDelete(DeleteBehavior.Restrict);
+
             b.HasIndex(x => x.ExpenseId).HasDatabaseName("IX_Ledger_Expense");
+            b.HasIndex(x => x.SourcePaymentId)
+             .IsUnique()
+             .HasFilter("[SourcePaymentId] IS NOT NULL")
+             .HasDatabaseName("UX_Ledger_SourcePayment");
             b.HasIndex(x => new { x.HouseId, x.PostDate }).HasDatabaseName("IX_Ledger_House_Post");
             b.HasIndex(x => new { x.HouseId, x.FromUserId, x.ToUserId, x.PostDate })
              .HasDatabaseName("IX_Ledger_House_FromTo");

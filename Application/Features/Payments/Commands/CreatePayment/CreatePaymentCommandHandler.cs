@@ -12,7 +12,6 @@ namespace Application.Features.Payments.Commands.CreatePayment
         : IRequestHandler<CreatePaymentCommand, CreatedPaymentResponseDto>
     {
         private readonly IPaymentRepository _paymentRepo;
-        private readonly ILedgerLineRepository _ledgerRepo;
 
         // ⬇️ EKLENDİ: cycle/contract doğrulaması için
         private readonly IChargeCycleRepository _cycleRepo;
@@ -20,12 +19,10 @@ namespace Application.Features.Payments.Commands.CreatePayment
 
         public CreatePaymentCommandHandler(
             IPaymentRepository paymentRepo,
-            ILedgerLineRepository ledgerRepo,
             IChargeCycleRepository cycleRepo,
             IRecurringChargeRepository recurringRepo)
         {
             _paymentRepo = paymentRepo;
-            _ledgerRepo = ledgerRepo;
             _cycleRepo = cycleRepo;        // ⬅️ set
             _recurringRepo = recurringRepo;    // ⬅️ set
         }
@@ -67,23 +64,6 @@ namespace Application.Features.Payments.Commands.CreatePayment
                 if (cycle.Status == ChargeCycleStatus.Paid)
                     throw new InvalidOperationException("Cycle already paid");
             }
-            else
-            {
-                var openLines = await _ledgerRepo.ListOpenForPairAsync(
-                    request.HouseId,
-                    request.BorcluUserId,
-                    request.AlacakliUserId,
-                    DateTime.UtcNow,
-                    cancellationToken);
-                var outstanding = openLines.Sum(line => Math.Max(0m, line.Amount - line.PaidAmount));
-
-                if (outstanding <= 0)
-                    throw new InvalidOperationException("Bu kişiye ait açık bir borç bulunamadı.");
-                if (request.Tutar > outstanding)
-                    throw new InvalidOperationException(
-                        $"Ödeme tutarı açık borçtan büyük olamaz. En fazla {outstanding:0.00} TL ödeyebilirsiniz.");
-            }
-
             // ----------------------------------------------------------------
             // 2) Payment entity oluştur
             // (Mevcut alanları aynen korudum; sadece ChargeId ekliyorum.)

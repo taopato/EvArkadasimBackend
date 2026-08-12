@@ -30,6 +30,7 @@ namespace Application.Features.LedgerLines.Queries.GetLedgerLinesByHouse
                     Id = l.Id,
                     HouseId = l.HouseId,
                     ExpenseId = l.ExpenseId,
+                    SourcePaymentId = l.SourcePaymentId,
                     FromUserId = l.FromUserId,
                     ToUserId = l.ToUserId,
                     Amount = l.Amount,

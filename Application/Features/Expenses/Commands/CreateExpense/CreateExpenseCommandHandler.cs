@@ -54,8 +54,11 @@ namespace Application.Features.Expenses.Commands.CreateExpense
                 ? request.OrtakHarcamaTutari
                 : Math.Max(0m, request.Tutar - personalTotal);
 
-            var whenUtc = request.Date == default ? DateTime.UtcNow : request.Date.ToUniversalTime();
+            var whenUtc = request.PostDate.HasValue
+                ? request.PostDate.Value.ToUniversalTime()
+                : request.Date == default ? DateTime.UtcNow : request.Date.ToUniversalTime();
             var entity = BuildBaseExpense(request, ResolveTitle(request), ResolveCategoryNonNull(request), whenUtc);
+            entity.DueDate = request.DueDate?.ToUniversalTime() ?? whenUtc;
             entity.Tutar = request.Tutar;
             entity.OrtakHarcamaTutari = sharedAmount;
             entity.Type = ExpenseType.Irregular;

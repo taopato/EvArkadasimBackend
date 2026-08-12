@@ -9,7 +9,8 @@ namespace Domain.Entities
         public long Id { get; set; }                  // ← int → long
 
         public int HouseId { get; set; }
-        public int ExpenseId { get; set; }
+        public int? ExpenseId { get; set; }
+        public int? SourcePaymentId { get; set; }
         public int FromUserId { get; set; }
         public int ToUserId { get; set; }
 

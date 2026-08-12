@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Persistence.Contexts;
 
@@ -11,9 +12,11 @@ using Persistence.Contexts;
 namespace Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260806201525_AddRecurringChargeNote")]
+    partial class AddRecurringChargeNote
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -541,7 +544,7 @@ namespace Persistence.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("sysutcdatetime()");
 
-                    b.Property<int?>("ExpenseId")
+                    b.Property<int>("ExpenseId")
                         .HasColumnType("int");
 
                     b.Property<int>("FromUserId")
@@ -572,9 +575,6 @@ namespace Persistence.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
-                    b.Property<int?>("SourcePaymentId")
-                        .HasColumnType("int");
-
                     b.Property<int>("ToUserId")
                         .HasColumnType("int");
 
@@ -585,11 +585,6 @@ namespace Persistence.Migrations
 
                     b.HasIndex("ExpenseId")
                         .HasDatabaseName("IX_Ledger_Expense");
-
-                    b.HasIndex("SourcePaymentId")
-                        .IsUnique()
-                        .HasDatabaseName("UX_Ledger_SourcePayment")
-                        .HasFilter("[SourcePaymentId] IS NOT NULL");
 
                     b.HasIndex("HouseId", "PostDate")
                         .HasDatabaseName("IX_Ledger_House_Post");
@@ -1260,12 +1255,8 @@ namespace Persistence.Migrations
                     b.HasOne("Domain.Entities.Expense", null)
                         .WithMany()
                         .HasForeignKey("ExpenseId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
-                    b.HasOne("Domain.Entities.Payment", null)
-                        .WithMany()
-                        .HasForeignKey("SourcePaymentId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Domain.Entities.Payment", b =>

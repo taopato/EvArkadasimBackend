@@ -1,13 +1,13 @@
 # Add these site blocks to the public Caddy instance. The internal Host header
 # selects the correct blue/green environment in the Roomora gateway.
-api.takosware.com {
+api-roomora.takosware.com, api.takosware.com {
 	encode zstd gzip
 	reverse_proxy roomora-gateway:80 {
 		header_up Host api.roomora.builtwhys.space
 	}
 }
 
-testapi.takosware.com {
+testapi-roomora.takosware.com, testapi.takosware.com {
 	encode zstd gzip
 	reverse_proxy roomora-gateway:80 {
 		header_up Host testapi.roomora.builtwhys.space

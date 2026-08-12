@@ -232,6 +232,7 @@ namespace Persistence.Contexts
                 b.Property(x => x.SplitPolicy).HasConversion<int>();
                 b.Property(x => x.AccountingMode).HasConversion<int>();
                 b.Property(x => x.Title).HasMaxLength(120);
+                b.Property(x => x.Note).HasMaxLength(500);
                 b.Property(x => x.ParticipantsJson).HasMaxLength(2000);
                 b.Property(x => x.FixedAmount).HasPrecision(18, 2);
             });

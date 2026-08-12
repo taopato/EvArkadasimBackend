@@ -59,11 +59,6 @@ namespace Application.Features.Payments.Commands.ApprovePayment
             DateTime.UtcNow,
     ct
             );
-            var outstanding = openLines.Sum(line => Math.Max(0m, line.Amount - line.PaidAmount));
-            if (payment.Tutar > outstanding)
-                throw new InvalidOperationException(
-                    "Ödeme tutarı kalan açık borçtan büyük olduğu için onaylanamaz.");
-
             // 2) Tutarı FIFO paylaştır
             decimal remaining = payment.Tutar;
             var allocations = new List<PaymentAllocation>();
@@ -95,8 +90,25 @@ namespace Application.Features.Payments.Commands.ApprovePayment
                 remaining -= apply;
             }
 
+            // Mevcut borcu aşan tutar, gönderen kişi lehine alacak oluşturur.
+            // Böylece kullanıcı borcu olmasa bile avans/borç verme amaçlı ödeme yapabilir.
             if (remaining > 0)
-                throw new InvalidOperationException("Ödemenin tamamı açık borçlara uygulanamadı.");
+            {
+                await _ledgerRepo.AddAsync(new LedgerLine
+                {
+                    HouseId = payment.HouseId,
+                    ExpenseId = null,
+                    SourcePaymentId = payment.Id,
+                    FromUserId = payment.AlacakliUserId,
+                    ToUserId = payment.BorcluUserId,
+                    Amount = remaining,
+                    PaidAmount = 0m,
+                    PostDate = payment.OdemeTarihi,
+                    IsActive = true,
+                    IsClosed = false,
+                    CreatedAt = DateTime.UtcNow
+                }, ct);
+            }
 
             await _ledgerRepo.UpdateRangeAsync(openLines, ct);
 

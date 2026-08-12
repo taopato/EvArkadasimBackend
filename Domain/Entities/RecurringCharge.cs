@@ -11,6 +11,7 @@
         public int HouseId { get; set; }
         public ChargeType Type { get; set; }
         public string Title { get; set; } = string.Empty;
+        public string? Note { get; set; }
 
         public int PayerUserId { get; set; }
         public int CreatedByUserId { get; set; }
